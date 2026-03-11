@@ -1,35 +1,33 @@
-## Cost Accounting
+# Costy Web
 
-Mobile (iOS, Android) applications for personal and family budget managing.
-System receives purchases, incomes, and presentations statistics like charts and tables.
+Web application for personal and family budget managing: purchases, incomes, statistics (charts and tables), profile and category management.
 
-### Technician details
+- **Stack:** Next.js (App Router), React, TypeScript, Tailwind CSS, TanStack Query.
+- **Backend:** Costy microservices (money-actions, statistics, profile-service, bff-web) and external auth/user services.
 
-* Framework: React Native.
-* Language: JavaScript ES6.
-* Supported by: iOS, Android.
+## Getting started
 
-### Getting started
+The app lives in the `web/` directory. From repo root:
 
-#### iOS
+```bash
+cd web
+npm ci
+npm run dev
+```
 
-**Pre-setup:**
-* XCode (tested on version 12+)
-* CocoaPods (tested on version 1.10+)
-* Make `cd ios && pod install`
+Or use the root scripts (they delegate to `web/`):
 
-**Run:**  
-Default XCode simulator: `npm run ios`  
-iPhone 11 14.2: `npm run iphone-11`  
-iPhone 11 Max: `npm run iphone-11-max`  
-iPhone 11 Pro: `npm run iphone-11-pro`  
-iPhone 11 Pro Max: `npm run iphone-11-pro-max`  
-iPhone SE (1st generation): `npm run iphone-se`  
+```bash
+npm run build   # builds web app
+npm run dev     # runs dev server (from web/)
+```
 
-#### Android
+Open [http://localhost:3000](http://localhost:3000) (or the port Next.js prints).
 
-**Pre-setup:**  
-[Not implemented]
+## CI
 
-**Run:**  
-Default simulator: `npm run android`  
+GitHub Actions run lint and build from `web/` on changes under `web/**`. See `.github/workflows/web-ci.yml`.
+
+## Mobile
+
+Native iOS/Android clients are not part of this repo at the moment; they may be added later.
