@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { currentProjectId, currentUserId } from "@/lib/api/auth";
 import {
   loadCurrencies,
@@ -8,7 +8,7 @@ import {
   saveSplitIncome,
   saveSplitPurchase,
 } from "@/lib/api/moneyActions";
-import { loadProfileCategories } from "@/lib/api/profileService";
+import { loadProfileCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
 import { loadProjectUsers, ProjectUser } from "@/lib/api/user";
 
 type Mode = "purchase" | "income";
@@ -59,6 +59,22 @@ export default function AddPage() {
 
   const userId = currentUserId();
   const projectId = currentProjectId();
+  const prevModeRef = useRef<Mode>(mode);
+
+  // Clear form fields when switching between Purchase and Income
+  useEffect(() => {
+    if (prevModeRef.current !== mode) {
+      prevModeRef.current = mode;
+      setName("");
+      setAmount("");
+      setSplitEnabled(false);
+      setSelectedParticipantIds([]);
+      setAmountOverrides({});
+      setEditingParticipantId(null);
+      setEditingValue("");
+      setStatus("");
+    }
+  }, [mode]);
 
   const otherIds = splitEnabled ? selectedParticipantIds : [];
   const participantIds = useMemo(
@@ -86,12 +102,19 @@ export default function AddPage() {
   useEffect(() => {
     if (!userId) return;
     async function load() {
-      const [profileCats, curr] = await Promise.all([
+      const [profileCats, curr, profileSettings, projects] = await Promise.all([
         loadProfileCategories(userId),
         loadCurrencies(),
+        loadProfileSettings(userId),
+        loadProjectsForUser(userId),
       ]);
       setCurrencies(curr);
-      if (curr[0]) setCurrency(curr[0]);
+      const project = projectId ? projects.find((p) => p.id === projectId) : undefined;
+      const defaultCurrency =
+        project?.currency ?? profileSettings?.defaultCurrency ?? "USD";
+      setCurrency((prev) =>
+        curr.includes(defaultCurrency) ? defaultCurrency : curr.includes(prev) ? prev : curr[0] ?? "USD"
+      );
       const filtered = profileCats
         .filter((c) => (mode === "purchase" ? c.isPurchase : c.isIncome))
         .map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
@@ -99,7 +122,7 @@ export default function AddPage() {
       if (filtered[0]?.id) setCategory(filtered[0].id);
     }
     load();
-  }, [userId, mode]);
+  }, [userId, mode, projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -112,6 +135,16 @@ export default function AddPage() {
     }
     loadUsers();
   }, [projectId, userId]);
+
+  // When only two users in project, auto-select the other user when split is enabled
+  const twoUsersOnly = projectUsers.length === 1;
+  useEffect(() => {
+    if (twoUsersOnly && splitEnabled && projectUsers[0]?.id) {
+      setSelectedParticipantIds((prev) =>
+        prev.length === 1 && prev[0] === projectUsers[0].id ? prev : [projectUsers[0].id]
+      );
+    }
+  }, [twoUsersOnly, splitEnabled, projectUsers]);
 
   useEffect(() => {
     setAmountOverrides((prev) => {
@@ -211,12 +244,16 @@ export default function AddPage() {
 
       <div className="mt-6 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
-          Category
-          <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          Amount
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            step="any"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
           Name
@@ -229,16 +266,12 @@ export default function AddPage() {
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
-          Amount
-          <input
-            className={inputClass}
-            type="number"
-            min="0"
-            step="any"
-            placeholder="0.00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          Category
+          <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
           Currency
@@ -269,7 +302,7 @@ export default function AddPage() {
             />
           </button>
         </label>
-        {splitEnabled && (
+        {splitEnabled && !twoUsersOnly && (
           <div className="rounded border border-[var(--border)] bg-[var(--card)] p-3">
             <p className="mb-2 text-sm font-medium text-[var(--foreground)]">Available users</p>
             <div className="grid gap-2">

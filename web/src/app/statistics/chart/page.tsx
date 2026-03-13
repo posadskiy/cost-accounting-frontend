@@ -78,6 +78,27 @@ export default function StatisticsChartPage() {
   const maxPurchase = Math.max(...purchaseEntries.map(([, v]) => v.amount ?? 0), 1);
   const maxIncome = Math.max(...incomeEntries.map(([, v]) => v.amount ?? 0), 1);
 
+  /** 0 = exceeded (>100%), 1 = high (80–100%), 2 = normal (<80% or no limit). */
+  function purchaseTier(stat: CategoryStat): number {
+    const limit = stat.limit ?? 0;
+    if (limit <= 0) return 2;
+    const pct = (100 * (stat.amount ?? 0)) / limit;
+    if (pct > 100) return 0;
+    if (pct >= 80) return 1;
+    return 2;
+  }
+
+  const sortedPurchaseEntries = [...purchaseEntries].sort(([, a], [, b]) => {
+    const tierA = purchaseTier(a);
+    const tierB = purchaseTier(b);
+    if (tierA !== tierB) return tierA - tierB;
+    const limitA = a.limit ?? 0;
+    const limitB = b.limit ?? 0;
+    const pctA = limitA > 0 ? (100 * (a.amount ?? 0)) / limitA : 0;
+    const pctB = limitB > 0 ? (100 * (b.amount ?? 0)) / limitB : 0;
+    return pctB - pctA; // higher % first within same tier
+  });
+
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-6 text-[var(--foreground)]">
       <header className="mb-4">
@@ -104,22 +125,22 @@ export default function StatisticsChartPage() {
         <p className="mb-3 text-sm">
           {purchasesTotal.toFixed(0)} / {purchasesLimit.toFixed(0)} $
         </p>
-        {purchasesLimit > 0 && purchasesTotal >= purchasesLimit && (
+        {purchasesLimit > 0 && purchasesTotal > purchasesLimit && (
           <p className="mb-2 text-sm font-medium text-red-600 dark:text-red-400" role="alert">
             Over your total purchase limit this month.
           </p>
         )}
-        {purchasesLimit > 0 && purchasesTotal >= purchasesLimit * 0.8 && purchasesTotal < purchasesLimit && (
+        {purchasesLimit > 0 && purchasesTotal >= purchasesLimit * 0.8 && purchasesTotal <= purchasesLimit && (
           <p className="mb-2 text-sm font-medium text-amber-600 dark:text-amber-400" role="alert">
             Close to your total purchase limit.
           </p>
         )}
         <ul className="space-y-2">
-          {purchaseEntries.map(([categoryId, stat]) => {
+          {sortedPurchaseEntries.map(([categoryId, stat]) => {
             const amount = stat.amount ?? 0;
             const limit = stat.limit ?? 0;
-            const over = limit > 0 && amount >= limit;
-            const close = limit > 0 && amount >= limit * 0.8 && amount < limit;
+            const over = limit > 0 && amount > limit;
+            const close = limit > 0 && amount >= limit * 0.8 && amount <= limit;
             return (
               <li key={categoryId} className="flex items-center gap-2">
                 <span className="w-24 shrink-0 truncate text-sm" title={categoryId}>
@@ -128,18 +149,19 @@ export default function StatisticsChartPage() {
                 <div className="min-w-0 flex-1">
                   <div
                     className={`h-6 rounded opacity-80 ${
-                      over ? "bg-red-500 dark:bg-red-600" : close ? "bg-amber-500 dark:bg-amber-600" : "bg-[var(--purchase)]"
+                      over ? "bg-red-500 dark:bg-red-600" : close ? "bg-amber-500 dark:bg-amber-600" : "bg-neutral-300 dark:bg-neutral-600"
                     }`}
                     style={{
-                      width: `${Math.min(100, (100 * amount) / maxPurchase)}%`,
+                      width: limit > 0
+                        ? `${Math.min(100, (100 * amount) / limit)}%`
+                        : `${Math.min(100, (100 * amount) / maxPurchase)}%`,
                     }}
                   />
                 </div>
                 <span
-                  className={`shrink-0 text-sm ${over ? "text-red-600 dark:text-red-400 font-medium" : close ? "text-amber-600 dark:text-amber-400" : "text-[var(--purchase)]"}`}
+                  className={`shrink-0 text-sm ${over ? "text-red-600 dark:text-red-400 font-medium" : close ? "text-amber-600 dark:text-amber-400" : "text-[var(--foreground)]"}`}
                 >
                   {amount.toFixed(0)} $ {limit > 0 && ` / ${limit.toFixed(0)} $ limit`}
-                  {over && " (over)"}
                 </span>
               </li>
             );

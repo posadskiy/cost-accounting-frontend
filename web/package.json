@@ -19,12 +19,13 @@
     "@mui/material": "^5.17.1",
     "@tanstack/react-query": "^5.90.21",
     "auth-component-react": "^1.3.0",
-    "user-component-react": "^1.3.0",
     "axios": "^1.13.2",
+    "emoji-picker-react": "^4.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
     "react-router-dom": "^7.6.1",
+    "user-component-react": "^1.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

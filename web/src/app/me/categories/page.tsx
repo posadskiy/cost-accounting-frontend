@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import EmojiPicker, { Theme } from "emoji-picker-react";
 import { currentUserId } from "@/lib/api/auth";
 import {
   createProfileCategory,
@@ -42,8 +43,7 @@ export default function CategoriesPage() {
   const userId = currentUserId();
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("");
-  const [isPurchase, setIsPurchase] = useState(true);
-  const [isIncome, setIsIncome] = useState(false);
+  const [isPurchase, setIsPurchase] = useState(true); // true = Purchase, false = Income
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -51,6 +51,7 @@ export default function CategoriesPage() {
   const [editIsPurchase, setEditIsPurchase] = useState(true);
   const [editIsIncome, setEditIsIncome] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [emojiPickerFor, setEmojiPickerFor] = useState<null | "add" | "edit">(null);
 
   const { data: categories = [], refetch } = useQuery<ProfileCategory[]>({
     queryKey: ["profile-categories", userId],
@@ -67,7 +68,7 @@ export default function CategoriesPage() {
       name: name.trim(),
       emoji: emoji.trim() || undefined,
       isPurchase,
-      isIncome,
+      isIncome: !isPurchase,
     });
     if (created) {
       setName("");
@@ -80,8 +81,9 @@ export default function CategoriesPage() {
     setEditingId(c.id);
     setEditName(c.name);
     setEditEmoji(c.emoji ?? "");
+    // Switch: exactly one of Purchase / Income (prefer Purchase if both set)
     setEditIsPurchase(c.isPurchase);
-    setEditIsIncome(c.isIncome);
+    setEditIsIncome(!c.isPurchase);
   }
 
   function cancelEdit() {
@@ -129,31 +131,49 @@ export default function CategoriesPage() {
             placeholder="Category name"
             onChange={(e) => setName(e.target.value)}
           />
-          <input
-            className={inputClass}
-            value={emoji}
-            placeholder="Emoji (optional)"
-            onChange={(e) => setEmoji(e.target.value)}
-          />
+          <div className="flex gap-2">
+            <input
+              className={inputClass}
+              value={emoji}
+              placeholder="Emoji (optional)"
+              onChange={(e) => setEmoji(e.target.value)}
+            />
+            <button
+              type="button"
+              aria-label="Choose emoji"
+              className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-lg hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              onClick={() => setEmojiPickerFor("add")}
+            >
+              {emoji || "😀"}
+            </button>
+          </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isPurchase}
-              onChange={(e) => setIsPurchase(e.target.checked)}
-            />
-            Purchase
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isIncome}
-              onChange={(e) => setIsIncome(e.target.checked)}
-            />
-            Income
-          </label>
-          <button type="button" className={btnPrimary} onClick={onCreate}>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex gap-1" role="group" aria-label="Category type">
+            <button
+              type="button"
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                isPurchase
+                  ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                  : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+              }`}
+              onClick={() => setIsPurchase(true)}
+            >
+              Purchase
+            </button>
+            <button
+              type="button"
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                !isPurchase
+                  ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                  : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+              }`}
+              onClick={() => setIsPurchase(false)}
+            >
+              Income
+            </button>
+          </div>
+          <button type="button" className={`${btnPrimary} shrink-0`} onClick={onCreate}>
             Add category
           </button>
         </div>
@@ -177,30 +197,54 @@ export default function CategoriesPage() {
                       placeholder="Name"
                       onChange={(e) => setEditName(e.target.value)}
                     />
-                    <input
-                      className={inputClass}
-                      value={editEmoji}
-                      placeholder="Emoji"
-                      onChange={(e) => setEditEmoji(e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        className={inputClass}
+                        value={editEmoji}
+                        placeholder="Emoji"
+                        onChange={(e) => setEditEmoji(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Choose emoji"
+                        className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-lg hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        onClick={() => setEmojiPickerFor("edit")}
+                      >
+                        {editEmoji || "😀"}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editIsPurchase}
-                        onChange={(e) => setEditIsPurchase(e.target.checked)}
-                      />
-                      Purchase
-                    </label>
-                    <label className="flex items-center gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editIsIncome}
-                        onChange={(e) => setEditIsIncome(e.target.checked)}
-                      />
-                      Income
-                    </label>
+                    <div className="flex gap-1" role="group" aria-label="Category type">
+                      <button
+                        type="button"
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                          editIsPurchase
+                            ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                            : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+                        }`}
+                        onClick={() => {
+                          setEditIsPurchase(true);
+                          setEditIsIncome(false);
+                        }}
+                      >
+                        Purchase
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                          editIsIncome
+                            ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                            : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+                        }`}
+                        onClick={() => {
+                          setEditIsPurchase(false);
+                          setEditIsIncome(true);
+                        }}
+                      >
+                        Income
+                      </button>
+                    </div>
                     <button type="button" className={btnPrimary} onClick={onSaveEdit}>
                       Save
                     </button>
@@ -265,30 +309,54 @@ export default function CategoriesPage() {
                       placeholder="Name"
                       onChange={(e) => setEditName(e.target.value)}
                     />
-                    <input
-                      className={inputClass}
-                      value={editEmoji}
-                      placeholder="Emoji"
-                      onChange={(e) => setEditEmoji(e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        className={inputClass}
+                        value={editEmoji}
+                        placeholder="Emoji"
+                        onChange={(e) => setEditEmoji(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Choose emoji"
+                        className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-lg hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        onClick={() => setEmojiPickerFor("edit")}
+                      >
+                        {editEmoji || "😀"}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editIsPurchase}
-                        onChange={(e) => setEditIsPurchase(e.target.checked)}
-                      />
-                      Purchase
-                    </label>
-                    <label className="flex items-center gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editIsIncome}
-                        onChange={(e) => setEditIsIncome(e.target.checked)}
-                      />
-                      Income
-                    </label>
+                    <div className="flex gap-1" role="group" aria-label="Category type">
+                      <button
+                        type="button"
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                          editIsPurchase
+                            ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                            : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+                        }`}
+                        onClick={() => {
+                          setEditIsPurchase(true);
+                          setEditIsIncome(false);
+                        }}
+                      >
+                        Purchase
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                          editIsIncome
+                            ? "bg-[var(--primary)] text-primary-foreground shadow-sm"
+                            : "border border-[var(--border)] bg-transparent text-[var(--muted-foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
+                        }`}
+                        onClick={() => {
+                          setEditIsPurchase(false);
+                          setEditIsIncome(true);
+                        }}
+                      >
+                        Income
+                      </button>
+                    </div>
                     <button type="button" className={btnPrimary} onClick={onSaveEdit}>
                       Save
                     </button>
@@ -334,6 +402,34 @@ export default function CategoriesPage() {
           <p className="text-sm text-neutral-500">No income categories yet.</p>
         )}
       </section>
+
+      {/* Emoji picker modal */}
+      {emojiPickerFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose emoji"
+          onClick={() => setEmojiPickerFor(null)}
+        >
+          <div
+            className="max-h-[90vh] overflow-auto rounded-lg shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <EmojiPicker
+              open
+              theme={typeof document !== "undefined" && document.documentElement.classList.contains("dark") ? Theme.DARK : Theme.LIGHT}
+              onEmojiClick={(data) => {
+                if (emojiPickerFor === "add") setEmoji(data.emoji);
+                else setEditEmoji(data.emoji);
+                setEmojiPickerFor(null);
+              }}
+              width={320}
+              height={400}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation */}
       {categoryToDelete && (() => {

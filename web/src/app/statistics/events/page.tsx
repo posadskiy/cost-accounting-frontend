@@ -278,8 +278,8 @@ export default function StatisticsEventsPage() {
 
   const purchasesTotal = `Purchases: ${purchases.amount.toFixed(0)} $ / ${purchases.limit.toFixed(0)} $ limit`;
   const incomesTotal = `Income: ${incomes.amount.toFixed(0)} $`;
-  const isOverLimit = purchases.limit > 0 && purchases.amount >= purchases.limit;
-  const isCloseToLimit = purchases.limit > 0 && purchases.amount >= purchases.limit * 0.8 && purchases.amount < purchases.limit;
+  const isOverLimit = purchases.limit > 0 && purchases.amount > purchases.limit;
+  const isCloseToLimit = purchases.limit > 0 && purchases.amount >= purchases.limit * 0.8 && purchases.amount <= purchases.limit;
 
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-6 text-[var(--foreground)]">

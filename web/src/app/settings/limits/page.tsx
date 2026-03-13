@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { currentUserId } from "@/lib/api/auth";
-import { loadProfileCategories, updateProfileCategory, ProfileCategory } from "@/lib/api/profileService";
+import { currentProjectId, currentUserId } from "@/lib/api/auth";
+import {
+  loadProfileCategories,
+  loadProfileSettings,
+  loadProjectsForUser,
+  updateProfileCategory,
+  type ProfileCategory,
+} from "@/lib/api/profileService";
 
 const inputClass =
   "w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[var(--foreground)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
@@ -38,11 +44,26 @@ export default function SettingsLimitsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLimit, setEditLimit] = useState("");
 
+  const projectId = currentProjectId();
   const { data: categories = [], refetch } = useQuery<ProfileCategory[]>({
     queryKey: ["profile-categories", userId],
     queryFn: () => loadProfileCategories(userId!),
     enabled: !!userId,
   });
+  const { data: profileSettings } = useQuery({
+    queryKey: ["profile-settings", userId],
+    queryFn: () => loadProfileSettings(userId!),
+    enabled: !!userId,
+  });
+  const { data: projects = [] } = useQuery({
+    queryKey: ["profile-projects", userId],
+    queryFn: () => loadProjectsForUser(userId!),
+    enabled: !!userId,
+  });
+  const currency = useMemo(() => {
+    const project = projectId ? projects.find((p) => p.id === projectId) : undefined;
+    return project?.currency ?? profileSettings?.defaultCurrency ?? "USD";
+  }, [projectId, projects, profileSettings?.defaultCurrency]);
 
   const purchaseCategories = categories.filter((c) => c.isPurchase);
   const totalLimit = purchaseCategories.reduce((sum, c) => sum + (c.monthlyLimit ?? 0), 0);
@@ -82,11 +103,15 @@ export default function SettingsLimitsPage() {
       <section className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h2 className="mb-1 text-sm font-medium opacity-80">Total monthly limit</h2>
         <p className="text-xl font-bold">
-          {totalLimit > 0 ? `${totalLimit.toFixed(0)} $` : "—"}
+          {totalLimit > 0 ? `${totalLimit.toFixed(0)} ${currency}` : "—"}
         </p>
-        {totalLimit === 0 && purchaseCategories.length > 0 && (
-          <p className="mt-1 text-xs text-neutral-500">Set limits below to see the total.</p>
-        )}
+        <p className="mt-1 text-xs text-neutral-500">
+          {totalLimit > 0
+            ? "Sum of all purchase category limits set below."
+            : purchaseCategories.length > 0
+              ? "Set limits below to see the total."
+              : "Add purchase categories and set limits to see the total."}
+        </p>
       </section>
 
       <section className="mt-6">
@@ -103,7 +128,7 @@ export default function SettingsLimitsPage() {
                     {c.emoji ? `${c.emoji} ` : ""}{c.name}
                   </span>
                   <div className="flex flex-1 items-center gap-2 sm:flex-initial">
-                    <label className="sr-only">Monthly limit ($)</label>
+                    <label className="sr-only">Monthly limit ({currency})</label>
                     <input
                       className={`${inputClass} max-w-[8rem]`}
                       type="number"
@@ -114,7 +139,7 @@ export default function SettingsLimitsPage() {
                       onChange={(e) => setEditLimit(e.target.value)}
                       autoFocus
                     />
-                    <span className="text-sm opacity-70">$</span>
+                    <span className="text-sm opacity-70">{currency}</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button
@@ -143,7 +168,7 @@ export default function SettingsLimitsPage() {
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="rounded border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--foreground)]">
                       {c.monthlyLimit != null && c.monthlyLimit > 0
-                        ? `${Number(c.monthlyLimit).toFixed(0)} $ / month`
+                        ? `${Number(c.monthlyLimit).toFixed(0)} ${currency} / month`
                         : "Not set"}
                     </span>
                     <button

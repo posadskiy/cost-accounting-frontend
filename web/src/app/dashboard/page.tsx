@@ -31,8 +31,8 @@ export default function DashboardPage() {
   const purchaseLimit = purchases?.limit ?? 0;
   const incomeAmount = incomes?.amount ?? 0;
   const monthName = MONTH_NAMES[month - 1];
-  const isOverLimit = purchaseLimit > 0 && purchaseAmount >= purchaseLimit;
-  const isCloseToLimit = purchaseLimit > 0 && purchaseAmount >= purchaseLimit * 0.8 && purchaseAmount < purchaseLimit;
+  const isOverLimit = purchaseLimit > 0 && purchaseAmount > purchaseLimit;
+  const isCloseToLimit = purchaseLimit > 0 && purchaseAmount >= purchaseLimit * 0.8 && purchaseAmount <= purchaseLimit;
 
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-6 text-[var(--foreground)]">
