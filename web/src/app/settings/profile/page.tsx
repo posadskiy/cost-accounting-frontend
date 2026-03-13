@@ -3,7 +3,7 @@ import { currentUserId } from "@/lib/api/auth";
 import { getAccessToken } from "@/lib/auth/tokenStore";
 import { endpoints } from "@/lib/config/endpoints";
 
-export default function ProfilePage() {
+export default function SettingsProfilePage() {
   const userId = currentUserId() ?? "";
   const bearerToken = getAccessToken();
 
@@ -17,7 +17,7 @@ export default function ProfilePage() {
 
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-8 text-[var(--foreground)]">
-      <h1 className="mb-4 text-2xl font-bold">My Profile</h1>
+      <h1 className="mb-4 text-2xl font-bold">Profile</h1>
       <UserService
         apiUrl={endpoints.userBaseUrl}
         userId="me"

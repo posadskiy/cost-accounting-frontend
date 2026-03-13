@@ -1,8 +1,8 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Login } from "auth-component-react";
 import type { AuthResponse, RegisterResponse } from "auth-component-react";
-import { login as costyLogin } from "@/lib/api/auth";
-import { endpoints } from "@/lib/config/endpoints";
+import { login as costyLogin, setCurrentProjectId } from "@/lib/api/auth";
+import { loadProfileSettings, runOnboarding } from "@/lib/api/profileService";
 
 const DEFAULT_REDIRECT = "/";
 
@@ -27,7 +27,19 @@ export default function LoginPage() {
     },
   };
 
-  const handleSuccess = (_response: AuthResponse | RegisterResponse) => {
+  const handleSuccess = async (response: AuthResponse | RegisterResponse) => {
+    const userId = "userId" in response ? response.userId : null;
+    if (userId) {
+      try {
+        await runOnboarding(userId);
+        const settings = await loadProfileSettings(userId);
+        if (settings?.activeProjectId) {
+          setCurrentProjectId(settings.activeProjectId);
+        }
+      } catch (e) {
+        console.warn("Onboarding failed (defaults may still be created later):", e);
+      }
+    }
     const target = from && from.startsWith("/") && !from.startsWith("//") ? from : DEFAULT_REDIRECT;
     navigate(target);
   };

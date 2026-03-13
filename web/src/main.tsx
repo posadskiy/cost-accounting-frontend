@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import App from "./App";
 import RequireAuth from "./components/RequireAuth";
 
@@ -8,12 +8,15 @@ import RequireAuth from "./components/RequireAuth";
 import Home from "./app/page";
 import LoginPage from "./app/login/page";
 import RegisterPage from "./app/register/page";
-import ProfilePage from "./app/me/profile/page";
-import CategoriesPage from "./app/me/categories/page";
+import DashboardPage from "./app/dashboard/page";
+import AddPage from "./app/add/page";
 import StatisticsEventsPage from "./app/statistics/events/page";
 import StatisticsChartPage from "./app/statistics/chart/page";
-import NewIncomePage from "./app/income/new/page";
-import NewPurchasePage from "./app/purchase/new/page";
+import SettingsLayout from "./app/settings/SettingsLayout";
+import SettingsProfilePage from "./app/settings/profile/page";
+import SettingsCategoriesPage from "./app/settings/categories/page";
+import SettingsLimitsPage from "./app/settings/limits/page";
+import SettingsGeneralPage from "./app/settings/general/page";
 
 const router = createBrowserRouter([
   {
@@ -26,12 +29,25 @@ const router = createBrowserRouter([
       {
         element: <RequireAuth />,
         children: [
-          { path: "me/profile", element: <ProfilePage /> },
-          { path: "me/categories", element: <CategoriesPage /> },
+          { path: "dashboard", element: <DashboardPage /> },
+          { path: "add", element: <AddPage /> },
           { path: "statistics/events", element: <StatisticsEventsPage /> },
           { path: "statistics/chart", element: <StatisticsChartPage /> },
-          { path: "income/new", element: <NewIncomePage /> },
-          { path: "purchase/new", element: <NewPurchasePage /> },
+          {
+            path: "settings",
+            element: <SettingsLayout />,
+            children: [
+              { index: true, element: <Navigate to="/settings/profile" replace /> },
+              { path: "profile", element: <SettingsProfilePage /> },
+              { path: "categories", element: <SettingsCategoriesPage /> },
+              { path: "limits", element: <SettingsLimitsPage /> },
+              { path: "general", element: <SettingsGeneralPage /> },
+            ],
+          },
+          { path: "me/profile", element: <Navigate to="/settings/profile" replace /> },
+          { path: "me/categories", element: <Navigate to="/settings/categories" replace /> },
+          { path: "purchase/new", element: <Navigate to="/add" replace /> },
+          { path: "income/new", element: <Navigate to="/add" replace /> },
         ],
       },
     ],

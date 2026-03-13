@@ -8,6 +8,7 @@ export type Category = {
 };
 
 type MoneyActionPayload = {
+  id?: string;
   category: string;
   name: string;
   amount: number;
@@ -66,19 +67,50 @@ export async function saveIncome(userId: string, payload: MoneyActionPayload, pr
   return response.ok;
 }
 
+export async function deletePurchase(userId: string, purchaseId: string, projectId?: string): Promise<boolean> {
+  const resolvedProjectId =
+    projectId ??
+    (typeof window !== "undefined" ? sessionStorage.getItem("costy_project_id") ?? undefined : undefined);
+  const response = await apiFetch(`${endpoints.moneyActionsBaseUrl}/v1/purchase/delete`, {
+    method: "POST",
+    body: JSON.stringify({ userId, projectId: resolvedProjectId, purchaseId }),
+  });
+  return response.ok;
+}
+
+export async function deleteIncome(userId: string, incomeId: string, projectId?: string): Promise<boolean> {
+  const resolvedProjectId =
+    projectId ??
+    (typeof window !== "undefined" ? sessionStorage.getItem("costy_project_id") ?? undefined : undefined);
+  const response = await apiFetch(`${endpoints.moneyActionsBaseUrl}/v1/income/delete`, {
+    method: "POST",
+    body: JSON.stringify({ userId, projectId: resolvedProjectId, incomeId }),
+  });
+  return response.ok;
+}
+
 export async function saveSplitPurchase(
   ownerUserId: string,
   participantUserIds: string[],
   payload: MoneyActionPayload,
-  projectId?: string
+  projectId?: string,
+  amountsPerParticipant?: number[]
 ): Promise<boolean> {
   const participants = normalizeParticipants(ownerUserId, participantUserIds);
-  const splitAmount = participants.length > 0 ? payload.amount / participants.length : payload.amount;
+  const useCustom =
+    amountsPerParticipant &&
+    amountsPerParticipant.length === participants.length &&
+    amountsPerParticipant.every((a) => a >= 0);
+  const splitAmounts = useCustom
+    ? amountsPerParticipant!
+    : participants.map(() =>
+        Number((payload.amount / participants.length).toFixed(2))
+      );
   const results = await Promise.all(
-    participants.map((participantId) =>
+    participants.map((participantId, i) =>
       savePurchase(participantId, {
         ...payload,
-        amount: Number(splitAmount.toFixed(2)),
+        amount: splitAmounts[i],
       }, projectId)
     )
   );
@@ -89,15 +121,24 @@ export async function saveSplitIncome(
   ownerUserId: string,
   participantUserIds: string[],
   payload: MoneyActionPayload,
-  projectId?: string
+  projectId?: string,
+  amountsPerParticipant?: number[]
 ): Promise<boolean> {
   const participants = normalizeParticipants(ownerUserId, participantUserIds);
-  const splitAmount = participants.length > 0 ? payload.amount / participants.length : payload.amount;
+  const useCustom =
+    amountsPerParticipant &&
+    amountsPerParticipant.length === participants.length &&
+    amountsPerParticipant.every((a) => a >= 0);
+  const splitAmounts = useCustom
+    ? amountsPerParticipant!
+    : participants.map(() =>
+        Number((payload.amount / participants.length).toFixed(2))
+      );
   const results = await Promise.all(
-    participants.map((participantId) =>
+    participants.map((participantId, i) =>
       saveIncome(participantId, {
         ...payload,
-        amount: Number(splitAmount.toFixed(2)),
+        amount: splitAmounts[i],
       }, projectId)
     )
   );

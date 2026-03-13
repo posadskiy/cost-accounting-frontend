@@ -6,6 +6,7 @@ export type ProfileSettings = {
   defaultCurrency: string;
   locale: string;
   notificationsEnabled: boolean;
+  activeProjectId?: string | null;
 };
 
 export type ProfileCategory = {
@@ -15,7 +16,16 @@ export type ProfileCategory = {
   emoji?: string;
   isPurchase: boolean;
   isIncome: boolean;
+  /** Monthly spending limit for purchase categories (optional). */
+  monthlyLimit?: number | null;
 };
+
+/** Ensures default records exist for the user (e.g. default categories). Idempotent; call after first login. */
+export async function runOnboarding(userId: string): Promise<void> {
+  await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/settings/onboarding/${userId}`, {
+    method: "POST",
+  });
+}
 
 export async function loadProfileSettings(userId: string): Promise<ProfileSettings | null> {
   const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/settings/${userId}`, {

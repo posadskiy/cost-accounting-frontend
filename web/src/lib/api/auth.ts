@@ -89,6 +89,16 @@ export function currentProjectId(): string | null {
   return typeof window === "undefined" ? null : sessionStorage.getItem("costy_project_id");
 }
 
+/** Sync active project to session (e.g. after onboarding or loading profile settings). */
+export function setCurrentProjectId(projectId: string | null): void {
+  if (typeof window === "undefined") return;
+  if (projectId) {
+    sessionStorage.setItem("costy_project_id", projectId);
+  } else {
+    sessionStorage.removeItem("costy_project_id");
+  }
+}
+
 /**
  * Logs out the current user: clears token (and cookie), user id, and project id.
  * Call this before redirecting to /login (e.g. from a Logout button).

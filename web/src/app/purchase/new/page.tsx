@@ -22,10 +22,11 @@ export default function NewPurchasePage() {
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
   const [status, setStatus] = useState("");
 
-  const userId = currentUserId() ?? "demo-user";
-  const projectId = currentProjectId() ?? "demo-project";
+  const userId = currentUserId();
+  const projectId = currentProjectId();
 
   useEffect(() => {
+    if (!userId) return;
     async function load() {
       const [profileCats, curr] = await Promise.all([
         loadProfileCategories(userId),
@@ -43,6 +44,10 @@ export default function NewPurchasePage() {
   }, [userId]);
 
   useEffect(() => {
+    if (!projectId) {
+      setProjectUsers([]);
+      return;
+    }
     async function loadUsers() {
       const users = await loadProjectUsers(projectId);
       setProjectUsers(users.filter((user) => user.id && user.id !== userId));
@@ -55,6 +60,10 @@ export default function NewPurchasePage() {
   const splitPreview = splitAmountPerParticipant(Number(amount || "0"), totalParticipants);
 
   async function onSave() {
+    if (!userId || !projectId) {
+      setStatus("Sign in and select a project to add entries.");
+      return;
+    }
     if (Number(amount || "0") <= 0) {
       setStatus("Amount must be greater than 0");
       return;
@@ -103,6 +112,8 @@ export default function NewPurchasePage() {
           ))}
         </select>
         </label>
+        {projectUsers.length > 0 && (
+          <>
         <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
           Split (optional)
           <input
@@ -112,31 +123,31 @@ export default function NewPurchasePage() {
             onChange={(e) => setSplitWith(e.target.value)}
           />
         </label>
-        {projectUsers.length > 0 && (
-          <div className="rounded border border-[var(--border)] p-3">
-            <p className="mb-2 text-sm font-medium">Split with project users</p>
-            <div className="grid gap-2">
-              {projectUsers.map((user) => (
-                <label key={user.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedParticipantIds.includes(user.id)}
-                    onChange={(e) =>
-                      setSelectedParticipantIds((prev) =>
-                        e.target.checked ? [...prev, user.id] : prev.filter((id) => id !== user.id)
-                      )
-                    }
-                  />
-                  {user.name?.trim() || user.email?.trim() || user.id}
-                </label>
-              ))}
-            </div>
+        <div className="rounded border border-[var(--border)] p-3">
+          <p className="mb-2 text-sm font-medium">Split with project users</p>
+          <div className="grid gap-2">
+            {projectUsers.map((user) => (
+              <label key={user.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedParticipantIds.includes(user.id)}
+                  onChange={(e) =>
+                    setSelectedParticipantIds((prev) =>
+                      e.target.checked ? [...prev, user.id] : prev.filter((id) => id !== user.id)
+                    )
+                  }
+                />
+                {user.name?.trim() || user.email?.trim() || user.id}
+              </label>
+            ))}
           </div>
-        )}
+        </div>
         {participants.length > 0 && (
           <p className="text-sm opacity-80">
             Split preview: {totalParticipants} participants, {splitPreview.toFixed(2)} {currency} each.
           </p>
+        )}
+          </>
         )}
         <button
           type="button"
