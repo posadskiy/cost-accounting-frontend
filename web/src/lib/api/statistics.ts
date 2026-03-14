@@ -8,6 +8,24 @@ type StatsRequest = {
   month: number;
 };
 
+export type EventsListRequest = {
+  userId: string;
+  projectId?: string;
+  /** Current month mode when fromDate/toDate omitted */
+  year?: number;
+  month?: number;
+  /** Custom period (yyyy-MM-dd) */
+  fromDate?: string;
+  toDate?: string;
+  limit: number;
+  offset: number;
+};
+
+export type EventsListResponse = {
+  actions: unknown[];
+  hasMore: boolean;
+};
+
 export async function loadEvents(request: StatsRequest): Promise<Record<string, unknown[]>> {
   const response = await apiFetch(`${endpoints.statisticsBaseUrl}/v1/statistics/events`, {
     method: "POST",
@@ -15,6 +33,15 @@ export async function loadEvents(request: StatsRequest): Promise<Record<string, 
   });
   if (!response.ok) return {};
   return (await response.json()) as Record<string, unknown[]>;
+}
+
+export async function loadEventsList(request: EventsListRequest): Promise<EventsListResponse> {
+  const response = await apiFetch(`${endpoints.statisticsBaseUrl}/v1/statistics/events/list`, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) return { actions: [], hasMore: false };
+  return (await response.json()) as EventsListResponse;
 }
 
 export async function loadMonthPurchaseTotal(request: StatsRequest): Promise<{ amount: number; limit: number }> {

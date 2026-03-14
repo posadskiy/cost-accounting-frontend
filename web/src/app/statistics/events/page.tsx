@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { DatePickerInput } from "@mantine/dates";
 import { currentProjectId, currentUserId } from "@/lib/api/auth";
 import {
   deleteIncome,
@@ -9,7 +10,7 @@ import {
   savePurchase,
 } from "@/lib/api/moneyActions";
 import { loadProfileCategories } from "@/lib/api/profileService";
-import { loadEvents, loadMonthIncomeTotal, loadMonthPurchaseTotal } from "@/lib/api/statistics";
+import { loadEventsList } from "@/lib/api/statistics";
 
 type EventItem = {
   id?: string;
@@ -33,6 +34,14 @@ const inputClass =
 
 function pad(n: number) {
   return n < 10 ? "0" + n : String(n);
+}
+
+/** Format Date as yyyy-MM-dd in local time (for API). Avoids UTC shift. */
+function toLocalDateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  return `${y}-${m}-${day}`;
 }
 
 /** Backend may send date as ISO string or as epoch seconds (number). Format in user's local time. */
@@ -110,12 +119,25 @@ function TrashIcon({ className }: { className?: string }) {
   );
 }
 
+const BATCH_SIZE = 10;
+
 export default function StatisticsEventsPage() {
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [refreshing, setRefreshing] = useState(false);
+  const [actions, setActions] = useState<EventItem[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [periodMode, setPeriodMode] = useState<"currentMonth" | "custom">("currentMonth");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0);
+  const todayNoon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  const [rangeValue, setRangeValue] = useState<[Date | null, Date | null]>([
+    startOfCurrentMonth,
+    todayNoon,
+  ]);
   const [editMode, setEditMode] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editName, setEditName] = useState("");
@@ -128,6 +150,9 @@ export default function StatisticsEventsPage() {
   const [deleteError, setDeleteError] = useState("");
   const [swipeRevealedId, setSwipeRevealedId] = useState<string | null>(null);
   const touchStartX = useRef(0);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const lastInitialLoadKeyRef = useRef<string | null>(null);
+  const observerAttachedAtRef = useRef<number>(0);
 
   const userId = currentUserId();
   const projectId = currentProjectId();
@@ -139,38 +164,89 @@ export default function StatisticsEventsPage() {
     });
   }, []);
 
-  const request = { userId: userId!, projectId: projectId!, year, month };
-  const { data, refetch } = useQuery({
-    queryKey: ["statistics-events", userId, projectId, year, month],
-    enabled: canLoad,
-    queryFn: async () => {
-      const [ev, p, i] = await Promise.all([
-        loadEvents(request),
-        loadMonthPurchaseTotal(request),
-        loadMonthIncomeTotal(request),
-      ]);
-      return {
-        events: (ev ?? {}) as Record<string, EventItem[]>,
-        purchases: p ?? { amount: 0, limit: 0 },
-        incomes: i ?? { amount: 0 },
-      };
-    },
-  });
-
   const { data: profileCategories = [] } = useQuery({
     queryKey: ["profile-categories", userId],
     queryFn: () => loadProfileCategories(userId!),
     enabled: !!userId,
   });
 
-  const events = data?.events ?? {};
-  const purchases = data?.purchases ?? { amount: 0, limit: 0 };
-  const incomes = data?.incomes ?? { amount: 0 };
+  const loadPage = useCallback(
+    async (offset: number, append: boolean) => {
+      if (!userId || !projectId) return;
+      const isFirstPage = offset === 0;
+      if (isFirstPage && !append) setLoading(true);
+      else setLoadingMore(true);
+      try {
+        const req: Parameters<typeof loadEventsList>[0] = {
+          userId,
+          projectId,
+          limit: BATCH_SIZE,
+          offset,
+        };
+        if (periodMode === "custom" && customFrom && customTo) {
+          req.fromDate = customFrom;
+          req.toDate = customTo;
+        } else {
+          const d = new Date();
+          req.year = d.getFullYear();
+          req.month = d.getMonth() + 1;
+        }
+        const res = await loadEventsList(req);
+        const list = (res.actions ?? []) as EventItem[];
+        setActions((prev) => (append ? [...prev, ...list] : list));
+        setHasMore(res.hasMore ?? false);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [userId, projectId, periodMode, customFrom, customTo]
+  );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setTimeout(() => setRefreshing(false), 400);
+  const periodKey = `${periodMode}-${customFrom}-${customTo}`;
+  useEffect(() => {
+    if (!canLoad) return;
+    if (lastInitialLoadKeyRef.current === periodKey) return;
+    lastInitialLoadKeyRef.current = periodKey;
+    loadPage(0, false);
+  }, [canLoad, periodKey, loadPage]);
+
+  useEffect(() => {
+    if (!hasMore || loadingMore || loading) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el) return;
+    observerAttachedAtRef.current = Date.now();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (Date.now() - observerAttachedAtRef.current < 400) return;
+        loadPage(actions.length, true);
+      },
+      { rootMargin: "100px", threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, actions.length, loadPage]);
+
+  const onRefresh = () => {
+    loadPage(0, false);
+  };
+
+  const clearPeriod = () => {
+    setPeriodMode("currentMonth");
+    setCustomFrom("");
+    setCustomTo("");
+    setRangeValue([startOfCurrentMonth, todayNoon]);
+  };
+
+  const handleRangeChange = (value: [Date | null, Date | null]) => {
+    setRangeValue(value);
+    const [from, to] = value;
+    if (from && to) {
+      setCustomFrom(toLocalDateString(from));
+      setCustomTo(toLocalDateString(to));
+      setPeriodMode("custom");
+    }
   };
 
   function fillEditFormFromEvent(event: EventItem) {
@@ -224,10 +300,10 @@ export default function StatisticsEventsPage() {
     setShowDeleteConfirm(false);
     closeDetail();
     if (ok) {
-      await refetch();
+      onRefresh();
     } else {
       setDeleteError("Could not delete: item not found or already removed.");
-      await refetch();
+      onRefresh();
     }
   };
 
@@ -258,7 +334,7 @@ export default function StatisticsEventsPage() {
       : await savePurchase(userId, payload, projectId);
     setSaveStatus(ok ? "Saved" : "Failed");
     if (ok) {
-      await refetch();
+      onRefresh();
       setTimeout(() => closeDetail(), 400);
     }
   };
@@ -267,63 +343,53 @@ export default function StatisticsEventsPage() {
     ? profileCategories.filter((c) => c.isIncome).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }))
     : profileCategories.filter((c) => c.isPurchase).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
 
-  const sections = Object.entries(events)
-    .map(([dayStr, dayData]) => ({
-      day: parseInt(dayStr, 10),
-      title: `${pad(parseInt(dayStr, 10))}.${pad(month)}.${year}`,
-      data: (dayData ?? []) as EventItem[],
-    }))
-    .filter((s) => !Number.isNaN(s.day))
-    .sort((a, b) => b.day - a.day);
-
-  const purchasesTotal = `Purchases: ${purchases.amount.toFixed(0)} $ / ${purchases.limit.toFixed(0)} $ limit`;
-  const incomesTotal = `Income: ${incomes.amount.toFixed(0)} $`;
-  const isOverLimit = purchases.limit > 0 && purchases.amount > purchases.limit;
-  const isCloseToLimit = purchases.limit > 0 && purchases.amount >= purchases.limit * 0.8 && purchases.amount <= purchases.limit;
+  const sections = (() => {
+    const byDay = new Map<string, EventItem[]>();
+    for (const event of actions) {
+      try {
+        const d = toLocalDate(event.date as string | number);
+        if (Number.isNaN(d.getTime())) continue;
+        const title = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+        if (!byDay.has(title)) byDay.set(title, []);
+        byDay.get(title)!.push(event);
+      } catch {
+        // skip
+      }
+    }
+    return Array.from(byDay.entries())
+      .map(([title, data]) => ({ title, data }))
+      .sort((a, b) => {
+        const [dA, mA, yA] = a.title.split(".").map(Number);
+        const [dB, mB, yB] = b.title.split(".").map(Number);
+        if (yA !== yB) return yB - yA;
+        if (mA !== mB) return mB - mA;
+        return dB - dA;
+      });
+  })();
 
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-6 text-[var(--foreground)]">
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="rounded bg-[var(--primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-70"
-        >
-          {refreshing ? "Refreshing…" : `${MONTH_NAMES[month - 1]} ${year}`}
-        </button>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value) || 1)}
-            className="w-14 rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--foreground)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-          />
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value) || new Date().getFullYear())}
-            className="w-20 rounded-lg border border-[var(--border)] bg-white px-2 py-1.5 text-sm text-[var(--foreground)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-          />
-        </div>
+      <header className="mb-4">
+        <DatePickerInput
+          type="range"
+          placeholder="Pick period"
+          value={rangeValue}
+          onChange={handleRangeChange}
+          disabled={loading}
+          valueFormat="DD MMM YYYY"
+          clearable
+          onClear={clearPeriod}
+          aria-label="Select date range"
+          className="[&_.mantine-Input-input]:cursor-pointer [&_.mantine-Input-input]:text-center [&_.mantine-Input-input]:font-bold"
+          styles={{
+            input: {
+              backgroundColor: "var(--primary)",
+              color: "white",
+              border: "none",
+            },
+          }}
+        />
       </header>
-
-      <div className="mb-4 flex flex-col gap-1 text-sm">
-        <p className="font-medium">{purchasesTotal}</p>
-        {isOverLimit && (
-          <p className="font-medium text-red-600 dark:text-red-400" role="alert">
-            You&apos;ve exceeded your purchase limit this month.
-          </p>
-        )}
-        {isCloseToLimit && !isOverLimit && (
-          <p className="font-medium text-amber-600 dark:text-amber-400" role="alert">
-            Close to your purchase limit.
-          </p>
-        )}
-        <p className="font-medium">{incomesTotal}</p>
-      </div>
 
       {deleteError && (
         <p className="mb-2 text-sm text-amber-600" role="alert">
@@ -331,8 +397,10 @@ export default function StatisticsEventsPage() {
         </p>
       )}
 
-      {sections.length === 0 ? (
-        <p className="text-sm opacity-80">No events for this month.</p>
+      {loading && actions.length === 0 ? (
+        <p className="text-sm opacity-80">Loading…</p>
+      ) : sections.length === 0 ? (
+        <p className="text-sm opacity-80">No money actions.</p>
       ) : (
         <ul className="space-y-6">
           {sections.map(({ title, data }) => (
@@ -419,6 +487,8 @@ export default function StatisticsEventsPage() {
           ))}
         </ul>
       )}
+      {hasMore && <div ref={loadMoreSentinelRef} className="h-4" aria-hidden />}
+      {loadingMore && <p className="py-2 text-center text-sm opacity-70">Loading more…</p>}
 
       {/* Detail / Edit modal */}
       {selectedEvent && (

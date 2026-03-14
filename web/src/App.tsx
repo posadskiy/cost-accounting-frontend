@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Providers from "./app/providers";
 import ConditionalShell from "./components/ConditionalShell";
+import "@mantine/dates/styles.css";
 import "./app/globals.css";
 
 export default function App() {
