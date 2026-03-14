@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import EmojiPicker, { Theme } from "emoji-picker-react";
-import { currentUserId } from "@/lib/api/auth";
+import { currentProjectId, currentUserId } from "@/lib/api/auth";
 import {
-  createProfileCategory,
-  deleteProfileCategory,
-  loadProfileCategories,
-  updateProfileCategory,
-  ProfileCategory,
+  createProjectCategory,
+  deleteProjectCategory,
+  loadProjectCategories,
+  loadProjectMembers,
+  updateProjectCategory,
+  type ProjectCategory,
 } from "@/lib/api/profileService";
 
 const inputClass =
@@ -41,6 +42,7 @@ const btnSecondary =
 
 export default function CategoriesPage() {
   const userId = currentUserId();
+  const projectId = currentProjectId();
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("");
   const [isPurchase, setIsPurchase] = useState(true); // true = Purchase, false = Income
@@ -53,23 +55,33 @@ export default function CategoriesPage() {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [emojiPickerFor, setEmojiPickerFor] = useState<null | "add" | "edit">(null);
 
-  const { data: categories = [], refetch } = useQuery<ProfileCategory[]>({
-    queryKey: ["profile-categories", userId],
-    queryFn: () => loadProfileCategories(userId!),
-    enabled: !!userId,
+  const { data: categories = [], refetch } = useQuery<ProjectCategory[]>({
+    queryKey: ["project-categories", projectId],
+    queryFn: () => loadProjectCategories(projectId!),
+    enabled: !!projectId,
   });
+
+  const { data: members = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => loadProjectMembers(projectId!),
+    enabled: !!projectId,
+  });
+
+  const isOwner = useMemo(
+    () => members.some((m) => m.userId === userId && m.role === "OWNER"),
+    [members, userId]
+  );
 
   const purchaseCategories = categories.filter((c) => c.isPurchase);
   const incomeCategories = categories.filter((c) => c.isIncome);
 
   async function onCreate() {
-    if (!name.trim() || !userId) return;
-    const created = await createProfileCategory(userId, {
-      name: name.trim(),
-      emoji: emoji.trim() || undefined,
-      isPurchase,
-      isIncome: !isPurchase,
-    });
+    if (!name.trim() || !userId || !projectId || !isOwner) return;
+    const created = await createProjectCategory(
+      projectId,
+      { name: name.trim(), emoji: emoji.trim() || undefined, isPurchase, isIncome: !isPurchase },
+      userId
+    );
     if (created) {
       setName("");
       setEmoji("");
@@ -77,7 +89,7 @@ export default function CategoriesPage() {
     }
   }
 
-  function startEdit(c: ProfileCategory) {
+  function startEdit(c: ProjectCategory) {
     setEditingId(c.id);
     setEditName(c.name);
     setEditEmoji(c.emoji ?? "");
@@ -91,13 +103,13 @@ export default function CategoriesPage() {
   }
 
   async function onSaveEdit() {
-    if (editingId == null || !editName.trim() || !userId) return;
-    const updated = await updateProfileCategory(userId, editingId, {
-      name: editName.trim(),
-      emoji: editEmoji.trim() || undefined,
-      isPurchase: editIsPurchase,
-      isIncome: editIsIncome,
-    });
+    if (editingId == null || !editName.trim() || !userId || !projectId || !isOwner) return;
+    const updated = await updateProjectCategory(
+      projectId,
+      editingId,
+      { name: editName.trim(), emoji: editEmoji.trim() || undefined, isPurchase: editIsPurchase, isIncome: editIsIncome },
+      userId
+    );
     if (updated) {
       setEditingId(null);
       await refetch();
@@ -105,8 +117,8 @@ export default function CategoriesPage() {
   }
 
   async function confirmDelete() {
-    if (!userId || !categoryToDelete) return;
-    const ok = await deleteProfileCategory(userId, categoryToDelete);
+    if (!userId || !projectId || !categoryToDelete || !isOwner) return;
+    const ok = await deleteProjectCategory(projectId, categoryToDelete, userId);
     if (ok) {
       if (editingId === categoryToDelete) setEditingId(null);
       setCategoryToDelete(null);
@@ -116,12 +128,23 @@ export default function CategoriesPage() {
 
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-8 text-[var(--foreground)]">
-      <h1 className="text-2xl font-bold">My Categories</h1>
+      <h1 className="text-2xl font-bold">Project Categories</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        Add and edit categories for purchases and income. New users get a few defaults.
+        {!projectId
+          ? "Select a project to view and manage categories."
+          : isOwner
+            ? "Add and edit categories for this project. Only the project owner can make changes."
+            : "View categories for this project. Only the project owner can add or edit."}
       </p>
 
-      {/* Add new */}
+      {!projectId && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          No project selected. Create or join a project first.
+        </p>
+      )}
+
+      {/* Add new - owner only */}
+      {projectId && isOwner && (
       <section className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h2 className="mb-3 font-medium">Add category</h2>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -178,8 +201,10 @@ export default function CategoriesPage() {
           </button>
         </div>
       </section>
+      )}
 
       {/* Purchase categories */}
+      {projectId && (
       <section className="mt-6">
         <h2 className="mb-3 font-medium">Purchase categories</h2>
         <ul className="space-y-2">
@@ -188,7 +213,7 @@ export default function CategoriesPage() {
               key={c.id}
               className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              {editingId === c.id ? (
+              {editingId === c.id && isOwner ? (
                 <>
                   <div className="grid flex-1 gap-2 sm:grid-cols-2">
                     <input
@@ -264,22 +289,26 @@ export default function CategoriesPage() {
                         Also income
                       </span>
                     )}
-                    <button
-                      type="button"
-                      aria-label="Edit"
-                      className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      onClick={() => startEdit(c)}
-                    >
-                      <EditIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Delete"
-                      className="flex rounded p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      onClick={() => setCategoryToDelete(c.id)}
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+                    {isOwner && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Edit"
+                          className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                          onClick={() => startEdit(c)}
+                        >
+                          <EditIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Delete"
+                          className="flex rounded p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          onClick={() => setCategoryToDelete(c.id)}
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -290,8 +319,10 @@ export default function CategoriesPage() {
           <p className="text-sm text-neutral-500">No purchase categories yet.</p>
         )}
       </section>
+      )}
 
       {/* Income categories */}
+      {projectId && (
       <section className="mt-6">
         <h2 className="mb-3 font-medium">Income categories</h2>
         <ul className="space-y-2">
@@ -300,7 +331,7 @@ export default function CategoriesPage() {
               key={c.id}
               className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              {editingId === c.id ? (
+              {editingId === c.id && isOwner ? (
                 <>
                   <div className="grid flex-1 gap-2 sm:grid-cols-2">
                     <input
@@ -376,22 +407,26 @@ export default function CategoriesPage() {
                         Also purchase
                       </span>
                     )}
-                    <button
-                      type="button"
-                      aria-label="Edit"
-                      className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      onClick={() => startEdit(c)}
-                    >
-                      <EditIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Delete"
-                      className="flex rounded p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      onClick={() => setCategoryToDelete(c.id)}
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
+                    {isOwner && (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Edit"
+                          className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                          onClick={() => startEdit(c)}
+                        >
+                          <EditIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Delete"
+                          className="flex rounded p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          onClick={() => setCategoryToDelete(c.id)}
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -402,6 +437,7 @@ export default function CategoriesPage() {
           <p className="text-sm text-neutral-500">No income categories yet.</p>
         )}
       </section>
+      )}
 
       {/* Emoji picker modal */}
       {emojiPickerFor && (

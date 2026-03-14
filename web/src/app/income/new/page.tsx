@@ -7,7 +7,7 @@ import {
   saveSplitIncome,
   splitAmountPerParticipant,
 } from "@/lib/api/moneyActions";
-import { loadProfileCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
 import { loadProjectUsers, ProjectUser } from "@/lib/api/user";
 
 export default function NewIncomePage() {
@@ -28,13 +28,13 @@ export default function NewIncomePage() {
   useEffect(() => {
     if (!userId) return;
     async function load() {
-      const [profileCats, curr, profileSettings, projects] = await Promise.all([
-        loadProfileCategories(userId),
+      const [projectCats, curr, profileSettings, projects] = await Promise.all([
+        projectId ? loadProjectCategories(projectId) : Promise.resolve([]),
         loadCurrencies(),
         loadProfileSettings(userId),
         loadProjectsForUser(userId),
       ]);
-      const incomeCats = profileCats
+      const incomeCats = projectCats
         .filter((c) => c.isIncome)
         .map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
       setCategories(incomeCats);

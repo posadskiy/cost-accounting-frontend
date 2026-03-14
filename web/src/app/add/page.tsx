@@ -8,7 +8,7 @@ import {
   saveSplitIncome,
   saveSplitPurchase,
 } from "@/lib/api/moneyActions";
-import { loadProfileCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
 import { loadProjectUsers, ProjectUser } from "@/lib/api/user";
 
 type Mode = "purchase" | "income";
@@ -102,8 +102,8 @@ export default function AddPage() {
   useEffect(() => {
     if (!userId) return;
     async function load() {
-      const [profileCats, curr, profileSettings, projects] = await Promise.all([
-        loadProfileCategories(userId),
+      const [projectCats, curr, profileSettings, projects] = await Promise.all([
+        projectId ? loadProjectCategories(projectId) : Promise.resolve([]),
         loadCurrencies(),
         loadProfileSettings(userId),
         loadProjectsForUser(userId),
@@ -115,7 +115,7 @@ export default function AddPage() {
       setCurrency((prev) =>
         curr.includes(defaultCurrency) ? defaultCurrency : curr.includes(prev) ? prev : curr[0] ?? "USD"
       );
-      const filtered = profileCats
+      const filtered = projectCats
         .filter((c) => (mode === "purchase" ? c.isPurchase : c.isIncome))
         .map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
       setCategories(filtered);

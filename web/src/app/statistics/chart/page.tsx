@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { currentProjectId, currentUserId } from "@/lib/api/auth";
-import { loadProfileCategories } from "@/lib/api/profileService";
+import { loadProjectCategories } from "@/lib/api/profileService";
 import { loadMonth, loadProjectMonthsList } from "@/lib/api/statistics";
 
 const MONTH_NAMES = [
@@ -19,13 +19,14 @@ function parseMonthLabel(label: string): { year: number; month: number } {
   return { year, month: month || 1 };
 }
 
-/** Resolve category ID to display name using profile categories. */
+/** Resolve category ID to display name using project categories. */
 function getCategoryDisplayName(
   categoryId: string,
-  profileCategories: { id: string; name: string; emoji?: string | null }[]
+  projectCategories: { id: string; name: string; emoji?: string | null }[]
 ): string {
   if (!categoryId) return "—";
-  const found = profileCategories.find((c) => c.id === categoryId);
+  const found = projectCategories.find((c) => c.id === categoryId);
+  if (found) return found.emoji ? `${found.emoji} ${found.name}` : found.name;
   if (found) return found.emoji ? `${found.emoji} ${found.name}` : found.name;
   return "—";
 }
@@ -55,10 +56,10 @@ export default function StatisticsChartPage() {
     ? parseMonthLabel(resolvedLabel)
     : { year: now.getFullYear(), month: now.getMonth() + 1 };
 
-  const { data: profileCategories = [] } = useQuery({
-    queryKey: ["profile-categories", userId],
-    queryFn: () => loadProfileCategories(userId!),
-    enabled: !!userId,
+  const { data: projectCategories = [] } = useQuery({
+    queryKey: ["project-categories", projectId],
+    queryFn: () => loadProjectCategories(projectId!),
+    enabled: !!projectId,
   });
 
   const { data: payload = {} } = useQuery({
@@ -144,7 +145,7 @@ export default function StatisticsChartPage() {
             return (
               <li key={categoryId} className="flex items-center gap-2">
                 <span className="w-24 shrink-0 truncate text-sm" title={categoryId}>
-                  {getCategoryDisplayName(categoryId, profileCategories)}
+                  {getCategoryDisplayName(categoryId, projectCategories)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div
@@ -179,7 +180,7 @@ export default function StatisticsChartPage() {
           {incomeEntries.map(([categoryId, stat]) => (
             <li key={categoryId} className="flex items-center gap-2">
               <span className="w-24 shrink-0 truncate text-sm" title={categoryId}>
-                {getCategoryDisplayName(categoryId, profileCategories)}
+                {getCategoryDisplayName(categoryId, projectCategories)}
               </span>
               <div className="min-w-0 flex-1">
                 <div

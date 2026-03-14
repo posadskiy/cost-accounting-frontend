@@ -2,11 +2,12 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { currentProjectId, currentUserId } from "@/lib/api/auth";
 import {
-  loadProfileCategories,
+  loadProjectCategories,
+  loadProjectMembers,
   loadProfileSettings,
   loadProjectsForUser,
-  updateProfileCategory,
-  type ProfileCategory,
+  updateProjectCategory,
+  type ProjectCategory,
 } from "@/lib/api/profileService";
 
 const inputClass =
@@ -45,11 +46,20 @@ export default function SettingsLimitsPage() {
   const [editLimit, setEditLimit] = useState("");
 
   const projectId = currentProjectId();
-  const { data: categories = [], refetch } = useQuery<ProfileCategory[]>({
-    queryKey: ["profile-categories", userId],
-    queryFn: () => loadProfileCategories(userId!),
-    enabled: !!userId,
+  const { data: categories = [], refetch } = useQuery<ProjectCategory[]>({
+    queryKey: ["project-categories", projectId],
+    queryFn: () => loadProjectCategories(projectId!),
+    enabled: !!projectId,
   });
+  const { data: members = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => loadProjectMembers(projectId!),
+    enabled: !!projectId,
+  });
+  const isOwner = useMemo(
+    () => members.some((m) => m.userId === userId && m.role === "OWNER"),
+    [members, userId]
+  );
   const { data: profileSettings } = useQuery({
     queryKey: ["profile-settings", userId],
     queryFn: () => loadProfileSettings(userId!),
@@ -68,7 +78,7 @@ export default function SettingsLimitsPage() {
   const purchaseCategories = categories.filter((c) => c.isPurchase);
   const totalLimit = purchaseCategories.reduce((sum, c) => sum + (c.monthlyLimit ?? 0), 0);
 
-  function startEdit(c: ProfileCategory) {
+  function startEdit(c: ProjectCategory) {
     setEditingId(c.id);
     setEditLimit(c.monthlyLimit != null && c.monthlyLimit > 0 ? String(c.monthlyLimit) : "");
   }
@@ -79,17 +89,20 @@ export default function SettingsLimitsPage() {
   }
 
   async function confirmLimit() {
-    if (editingId == null || !userId) return;
+    if (editingId == null || !userId || !projectId || !isOwner) return;
     const val = editLimit.trim() ? Number(editLimit) : undefined;
     const num = val != null && !Number.isNaN(val) && val > 0 ? val : undefined;
-    const updated = await updateProfileCategory(userId, editingId, {
-      monthlyLimit: num,
-    });
+    const updated = await updateProjectCategory(
+      projectId,
+      editingId,
+      { monthlyLimit: num },
+      userId
+    );
     if (updated) {
       setEditingId(null);
       setEditLimit("");
       await refetch();
-      queryClient.invalidateQueries({ queryKey: ["profile-categories", userId] });
+      queryClient.invalidateQueries({ queryKey: ["project-categories", projectId] });
     }
   }
 
@@ -97,9 +110,16 @@ export default function SettingsLimitsPage() {
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-8 text-[var(--foreground)]">
       <h1 className="text-2xl font-bold">Monthly limits</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        Set a monthly spending limit for each purchase category. The app will notify you when you’re close to or over a limit.
+        {!projectId ? "Select a project to view and set monthly limits." : isOwner ? "Set a monthly spending limit for each purchase category. The app will notify you when you're close to or over a limit." : "View monthly limits for this project. Only the project owner can edit limits."}
       </p>
 
+      {!projectId && (
+        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          No project selected. Create or join a project first.
+        </p>
+      )}
+
+      {projectId && (
       <section className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
         <h2 className="mb-1 text-sm font-medium opacity-80">Total monthly limit</h2>
         <p className="text-xl font-bold">
@@ -113,7 +133,9 @@ export default function SettingsLimitsPage() {
               : "Add purchase categories and set limits to see the total."}
         </p>
       </section>
+      )}
 
+      {projectId && (
       <section className="mt-6">
         <h2 className="mb-3 font-medium">Limits by category</h2>
         <ul className="space-y-2">
@@ -122,7 +144,7 @@ export default function SettingsLimitsPage() {
               key={c.id}
               className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              {editingId === c.id ? (
+              {editingId === c.id && isOwner ? (
                 <div className="flex w-full flex-wrap items-center gap-3">
                   <span className="min-w-0 truncate font-medium">
                     {c.emoji ? `${c.emoji} ` : ""}{c.name}
@@ -171,14 +193,16 @@ export default function SettingsLimitsPage() {
                         ? `${Number(c.monthlyLimit).toFixed(0)} ${currency} / month`
                         : "Not set"}
                     </span>
-                    <button
-                      type="button"
-                      aria-label="Edit limit"
-                      className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
-                      onClick={() => startEdit(c)}
-                    >
-                      <EditIcon className="h-5 w-5" />
-                    </button>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        aria-label="Edit limit"
+                        className="flex rounded p-2 text-[var(--foreground)] hover:bg-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+                        onClick={() => startEdit(c)}
+                      >
+                        <EditIcon className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -189,6 +213,7 @@ export default function SettingsLimitsPage() {
           <p className="text-sm text-neutral-500">No purchase categories yet. Add them in Categories settings.</p>
         )}
       </section>
+      )}
     </main>
   );
 }

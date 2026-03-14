@@ -9,7 +9,7 @@ import {
   saveIncome,
   savePurchase,
 } from "@/lib/api/moneyActions";
-import { loadProfileCategories } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProjectMembers } from "@/lib/api/profileService";
 import { loadEventsList } from "@/lib/api/statistics";
 
 type EventItem = {
@@ -85,15 +85,15 @@ function getCategoryId(cat: EventItem["category"]): string {
 }
 
 type CategoryForDisplay = { id: string; name: string; emoji?: string | null };
-/** Resolve category to display name. When backend sends only ID (string), use profileCategories to show name. */
+/** Resolve category to display name. When backend sends only ID (string), use projectCategories to show name. */
 function getCategoryDisplay(
   cat: EventItem["category"],
-  profileCategories: CategoryForDisplay[] = []
+  projectCategories: CategoryForDisplay[] = []
 ): string {
   if (typeof cat === "object" && cat?.name) return cat.name;
   const id = typeof cat === "string" ? cat : typeof cat === "object" && cat?.id ? cat.id : "";
   if (!id) return "—";
-  const found = profileCategories.find((c) => c.id === id);
+  const found = projectCategories.find((c) => c.id === id);
   if (found) return found.emoji ? `${found.emoji} ${found.name}` : found.name;
   return "—";
 }
@@ -164,11 +164,28 @@ export default function StatisticsEventsPage() {
     });
   }, []);
 
-  const { data: profileCategories = [] } = useQuery({
-    queryKey: ["profile-categories", userId],
-    queryFn: () => loadProfileCategories(userId!),
-    enabled: !!userId,
+  const { data: projectCategories = [] } = useQuery({
+    queryKey: ["project-categories", projectId],
+    queryFn: () => loadProjectCategories(projectId!),
+    enabled: !!projectId,
   });
+
+  const { data: members = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => loadProjectMembers(projectId!),
+    enabled: !!projectId,
+  });
+
+  const isProjectOwner = members.some((m) => m.userId === userId && m.role === "OWNER");
+
+  const canEditOrDeleteEvent = useCallback(
+    (event: EventItem) => {
+      if (!userId) return false;
+      const isCreator = event.userId === userId;
+      return isCreator || isProjectOwner;
+    },
+    [userId, isProjectOwner]
+  );
 
   const loadPage = useCallback(
     async (offset: number, append: boolean) => {
@@ -322,7 +339,7 @@ export default function StatisticsEventsPage() {
     const isIncome = selectedEvent.type === "income";
     const payload = {
       id: selectedEvent.id,
-      category: (editCategory || profileCategories[0]?.id) ?? "",
+      category: (editCategory || projectCategories[0]?.id) ?? "",
       name,
       amount,
       currency: editCurrency,
@@ -340,8 +357,8 @@ export default function StatisticsEventsPage() {
   };
 
   const categoriesForType = selectedEvent?.type === "income"
-    ? profileCategories.filter((c) => c.isIncome).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }))
-    : profileCategories.filter((c) => c.isPurchase).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
+    ? projectCategories.filter((c) => c.isIncome).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }))
+    : projectCategories.filter((c) => c.isPurchase).map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
 
   const sections = (() => {
     const byDay = new Map<string, EventItem[]>();
@@ -409,59 +426,60 @@ export default function StatisticsEventsPage() {
               <ul className="space-y-2">
                 {data.map((event) => {
                   const isIncome = event.type === "income";
-                  const categoryName = getCategoryDisplay(event.category, profileCategories);
+                  const categoryName = getCategoryDisplay(event.category, projectCategories);
                   const amount = event.amount ?? 0;
                   const amountStr = (isIncome ? "+" : "-") + amount.toFixed(2) + "$";
                   const eventKey = event.id ?? `${event.name}-${amount}`;
                   const isSwipeRevealed = swipeRevealedId === eventKey;
+                  const canEdit = canEditOrDeleteEvent(event);
 
                   return (
                     <li
                       key={eventKey}
                       className="relative overflow-hidden rounded border border-[var(--border)] bg-[var(--card)]"
                     >
-                      {/* Swipe actions behind the row (revealed when row slides left) */}
-                      <div className="absolute right-0 top-0 z-0 flex h-full w-[120px] items-center justify-end gap-1 border-l border-[var(--border)] bg-[var(--card)] pr-2">
-                        <button
-                          type="button"
-                          aria-label="Edit"
-                          className="flex rounded bg-[var(--primary)] p-2 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDetail(event, true);
-                          }}
-                        >
-                          <EditIcon />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Remove"
-                          className="flex rounded bg-[var(--purchase)] p-2 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedEvent(event);
-                            setSwipeRevealedId(null);
-                            setShowDeleteConfirm(true);
-                          }}
-                        >
-                          <TrashIcon />
-                        </button>
-                      </div>
+                      {/* Swipe actions behind the row (only if user can edit/delete) */}
+                      {canEdit && (
+                        <div className="absolute right-0 top-0 z-0 flex h-full w-[120px] items-center justify-end gap-1 border-l border-[var(--border)] bg-[var(--card)] pr-2">
+                          <button
+                            type="button"
+                            aria-label="Edit"
+                            className="flex rounded bg-[var(--primary)] p-2 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetail(event, true);
+                            }}
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Remove"
+                            className="flex rounded bg-[var(--purchase)] p-2 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                              setSwipeRevealedId(null);
+                              setShowDeleteConfirm(true);
+                            }}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      )}
                       <div
                         className="relative z-10 flex w-full items-center justify-between bg-[var(--card)] px-3 py-2 transition-transform"
                         style={{
-                          transform: isSwipeRevealed ? "translateX(-120px)" : "translateX(0)",
+                          transform: canEdit && isSwipeRevealed ? "translateX(-120px)" : "translateX(0)",
                         }}
-                        onTouchStart={(e) => {
-                          touchStartX.current = e.touches[0].clientX;
-                        }}
-                        onTouchEnd={(e) => {
+                        onTouchStart={canEdit ? (e) => { touchStartX.current = e.touches[0].clientX; } : undefined}
+                        onTouchEnd={canEdit ? (e) => {
                           const diff = touchStartX.current - e.changedTouches[0].clientX;
                           if (diff > 50) setSwipeRevealedId(eventKey);
                           else if (diff < -30) setSwipeRevealedId(null);
-                        }}
+                        } : undefined}
                         onClick={() => {
-                          if (isSwipeRevealed) setSwipeRevealedId(null);
+                          if (canEdit && isSwipeRevealed) setSwipeRevealedId(null);
                           else openDetail(event, false);
                         }}
                       >
@@ -504,7 +522,7 @@ export default function StatisticsEventsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-3 top-3 flex items-center gap-1">
-              {!editMode && (
+              {!editMode && selectedEvent && canEditOrDeleteEvent(selectedEvent) && (
                 <>
                   <button
                     type="button"
@@ -635,7 +653,7 @@ export default function StatisticsEventsPage() {
                   </div>
                   <div>
                     <dt className="opacity-70">Category</dt>
-                    <dd className="font-medium">{getCategoryDisplay(selectedEvent.category, profileCategories)}</dd>
+                    <dd className="font-medium">{getCategoryDisplay(selectedEvent.category, projectCategories)}</dd>
                   </div>
                   <div>
                     <dt className="opacity-70">Amount</dt>

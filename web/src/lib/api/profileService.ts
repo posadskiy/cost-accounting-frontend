@@ -18,9 +18,10 @@ export type ProfileSettings = {
   activeProjectId?: string | null;
 };
 
-export type ProfileCategory = {
+/** Project-scoped category. Only OWNER can edit. */
+export type ProjectCategory = {
   id: string;
-  userId: string;
+  projectId: string;
   name: string;
   emoji?: string;
   isPurchase: boolean;
@@ -69,12 +70,15 @@ export async function setActiveProject(userId: string, projectId: string): Promi
   return response.ok;
 }
 
-export async function loadProfileCategories(userId: string): Promise<ProfileCategory[]> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/settings/categories/${userId}`, {
-    method: "GET",
-  });
+/** Load categories for a project. Any member can read. */
+export async function loadProjectCategories(projectId: string): Promise<ProjectCategory[]> {
+  if (!projectId) return [];
+  const response = await apiFetch(
+    `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories`,
+    { method: "GET" }
+  );
   if (!response.ok) return [];
-  return (await response.json()) as ProfileCategory[];
+  return (await response.json()) as ProjectCategory[];
 }
 
 /** Load all projects the user is a member of (includes project currency). */
@@ -167,38 +171,42 @@ export async function updateProjectCurrency(
   return (await response.json()) as Project;
 }
 
-export async function createProfileCategory(
-  userId: string,
-  payload: Omit<ProfileCategory, "id" | "userId">
-): Promise<ProfileCategory | null> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/settings/categories/${userId}`, {
+/** Create a category for a project. OWNER only. */
+export async function createProjectCategory(
+  projectId: string,
+  payload: Omit<ProjectCategory, "id" | "projectId">,
+  requesterUserId: string
+): Promise<ProjectCategory | null> {
+  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const response = await apiFetch(url, {
     method: "POST",
     body: JSON.stringify(payload),
   });
   if (!response.ok) return null;
-  return (await response.json()) as ProfileCategory;
+  return (await response.json()) as ProjectCategory;
 }
 
-export async function updateProfileCategory(
-  userId: string,
+/** Update a category. OWNER only. */
+export async function updateProjectCategory(
+  projectId: string,
   categoryId: string,
-  payload: Partial<Omit<ProfileCategory, "id" | "userId">>
-): Promise<ProfileCategory | null> {
-  const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/settings/categories/${userId}/${categoryId}`,
-    { method: "PUT", body: JSON.stringify(payload) }
-  );
+  payload: Partial<Omit<ProjectCategory, "id" | "projectId">>,
+  requesterUserId: string
+): Promise<ProjectCategory | null> {
+  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const response = await apiFetch(url, { method: "PUT", body: JSON.stringify(payload) });
   if (!response.ok) return null;
-  return (await response.json()) as ProfileCategory;
+  return (await response.json()) as ProjectCategory;
 }
 
-export async function deleteProfileCategory(userId: string, categoryId: string): Promise<boolean> {
-  const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/settings/categories/${userId}/${categoryId}`,
-    {
-      method: "DELETE",
-    }
-  );
+/** Delete a category. OWNER only. */
+export async function deleteProjectCategory(
+  projectId: string,
+  categoryId: string,
+  requesterUserId: string
+): Promise<boolean> {
+  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const response = await apiFetch(url, { method: "DELETE" });
   return response.ok;
 }
 

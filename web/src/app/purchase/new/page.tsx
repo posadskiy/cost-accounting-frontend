@@ -7,7 +7,7 @@ import {
   saveSplitPurchase,
   splitAmountPerParticipant,
 } from "@/lib/api/moneyActions";
-import { loadProfileCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
 import { loadProjectUsers, ProjectUser } from "@/lib/api/user";
 
 export default function NewPurchasePage() {
@@ -28,13 +28,13 @@ export default function NewPurchasePage() {
   useEffect(() => {
     if (!userId) return;
     async function load() {
-      const [profileCats, curr, profileSettings, projects] = await Promise.all([
-        loadProfileCategories(userId),
+      const [projectCats, curr, profileSettings, projects] = await Promise.all([
+        projectId ? loadProjectCategories(projectId) : Promise.resolve([]),
         loadCurrencies(),
         loadProfileSettings(userId),
         loadProjectsForUser(userId),
       ]);
-      const purchaseCats = profileCats
+      const purchaseCats = projectCats
         .filter((c) => c.isPurchase)
         .map((c) => ({ id: c.id, name: c.emoji ? `${c.emoji} ${c.name}` : c.name }));
       setCategories(purchaseCats);
