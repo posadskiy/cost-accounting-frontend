@@ -17,6 +17,8 @@ export default function SettingsLayout() {
   const isCategories = path === "/settings/categories";
   const isLimits = path === "/settings/limits";
   const isGeneral = path === "/settings/general";
+  const isMembers = path === "/settings/members";
+  const isInvites = path === "/settings/invites";
 
   const buttonClass = (active: boolean) =>
     `${base} ${active ? activeClass : inactiveClass}`;
@@ -56,6 +58,20 @@ export default function SettingsLayout() {
             className={buttonClass(isGeneral)}
           >
             Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/settings/members")}
+            className={buttonClass(isMembers)}
+          >
+            Members
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/settings/invites")}
+            className={buttonClass(isInvites)}
+          >
+            Invites
           </button>
           <button
             type="button"

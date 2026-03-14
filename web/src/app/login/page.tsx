@@ -31,7 +31,11 @@ export default function LoginPage() {
     const userId = "userId" in response ? response.userId : null;
     if (userId) {
       try {
-        await runOnboarding(userId);
+        const result = await runOnboarding(userId);
+        if (result?.needsProjectSelection) {
+          navigate("/project-selection");
+          return;
+        }
         const settings = await loadProfileSettings(userId);
         if (settings?.activeProjectId) {
           setCurrentProjectId(settings.activeProjectId);

@@ -8,6 +8,7 @@ import RequireAuth from "./components/RequireAuth";
 import Home from "./app/page";
 import LoginPage from "./app/login/page";
 import RegisterPage from "./app/register/page";
+import ProjectSelectionPage from "./app/project-selection/page";
 import DashboardPage from "./app/dashboard/page";
 import AddPage from "./app/add/page";
 import StatisticsEventsPage from "./app/statistics/events/page";
@@ -17,6 +18,8 @@ import SettingsProfilePage from "./app/settings/profile/page";
 import SettingsCategoriesPage from "./app/settings/categories/page";
 import SettingsLimitsPage from "./app/settings/limits/page";
 import SettingsGeneralPage from "./app/settings/general/page";
+import SettingsMembersPage from "./app/settings/members/page";
+import SettingsInvitesPage from "./app/settings/invites/page";
 
 const router = createBrowserRouter([
   {
@@ -29,6 +32,7 @@ const router = createBrowserRouter([
       {
         element: <RequireAuth />,
         children: [
+          { path: "project-selection", element: <ProjectSelectionPage /> },
           { path: "dashboard", element: <DashboardPage /> },
           { path: "add", element: <AddPage /> },
           { path: "statistics/events", element: <StatisticsEventsPage /> },
@@ -42,6 +46,8 @@ const router = createBrowserRouter([
               { path: "categories", element: <SettingsCategoriesPage /> },
               { path: "limits", element: <SettingsLimitsPage /> },
               { path: "general", element: <SettingsGeneralPage /> },
+              { path: "members", element: <SettingsMembersPage /> },
+              { path: "invites", element: <SettingsInvitesPage /> },
             ],
           },
           { path: "me/profile", element: <Navigate to="/settings/profile" replace /> },
