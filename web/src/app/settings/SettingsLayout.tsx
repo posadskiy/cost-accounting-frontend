@@ -1,5 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { logout } from "@/lib/api/auth";
+import { useQuery } from "@tanstack/react-query";
+import { currentProjectId, logout, currentUserId } from "@/lib/api/auth";
+import { loadProjectMembers } from "@/lib/api/profileService";
 
 const base =
   "block shrink-0 rounded-lg border border-[var(--border)] px-3 py-2.5 text-left text-sm font-medium transition-colors sm:w-full";
@@ -12,6 +14,16 @@ export default function SettingsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const path = location.pathname;
+  const projectId = currentProjectId();
+  const userId = currentUserId();
+
+  const { data: members = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => loadProjectMembers(projectId!),
+    enabled: !!projectId,
+  });
+
+  const isProjectOwner = members.some((m) => m.userId === userId && m.role === "OWNER");
 
   const isProfile = path === "/settings/profile" || path === "/settings";
   const isCategories = path === "/settings/categories";
@@ -59,20 +71,24 @@ export default function SettingsLayout() {
           >
             Settings
           </button>
-          <button
-            type="button"
-            onClick={() => navigate("/settings/members")}
-            className={buttonClass(isMembers)}
-          >
-            Members
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/settings/invites")}
-            className={buttonClass(isInvites)}
-          >
-            Invites
-          </button>
+          {isProjectOwner && (
+            <button
+              type="button"
+              onClick={() => navigate("/settings/members")}
+              className={buttonClass(isMembers)}
+            >
+              Members
+            </button>
+          )}
+          {isProjectOwner && (
+            <button
+              type="button"
+              onClick={() => navigate("/settings/invites")}
+              className={buttonClass(isInvites)}
+            >
+              Invites
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
