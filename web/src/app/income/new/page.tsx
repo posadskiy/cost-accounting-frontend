@@ -27,12 +27,13 @@ export default function NewIncomePage() {
 
   useEffect(() => {
     if (!userId) return;
+    const uid = userId;
     async function load() {
       const [projectCats, curr, profileSettings, projects] = await Promise.all([
         projectId ? loadProjectCategories(projectId) : Promise.resolve([]),
         loadCurrencies(),
-        loadProfileSettings(userId),
-        loadProjectsForUser(userId),
+        loadProfileSettings(uid),
+        loadProjectsForUser(uid),
       ]);
       const incomeCats = projectCats
         .filter((c) => c.isIncome)
@@ -55,8 +56,9 @@ export default function NewIncomePage() {
       setProjectUsers([]);
       return;
     }
+    const pid = projectId;
     async function loadUsers() {
-      const users = await loadProjectUsers(projectId);
+      const users = await loadProjectUsers(pid);
       setProjectUsers(users.filter((user) => user.id && user.id !== userId));
     }
     loadUsers();

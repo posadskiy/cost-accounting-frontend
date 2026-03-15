@@ -23,7 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <MantineProvider>
-        <DatesProvider>
+        <DatesProvider settings={{}}>
         <ThemeProvider theme={muiTheme}>
           <CssBaseline />
           {children}

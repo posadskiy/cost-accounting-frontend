@@ -102,12 +102,13 @@ export default function AddPage() {
 
   useEffect(() => {
     if (!userId) return;
+    const uid = userId;
     async function load() {
       const [projectCats, curr, profileSettings, projects] = await Promise.all([
         projectId ? loadProjectCategories(projectId) : Promise.resolve([]),
         loadCurrencies(),
-        loadProfileSettings(userId),
-        loadProjectsForUser(userId),
+        loadProfileSettings(uid),
+        loadProjectsForUser(uid),
       ]);
       setCurrencies(curr);
       const project = projectId ? projects.find((p) => p.id === projectId) : undefined;
@@ -131,8 +132,9 @@ export default function AddPage() {
       setUsernames({});
       return;
     }
+    const pid = projectId;
     async function loadUsers() {
-      const users = await loadProjectUsers(projectId);
+      const users = await loadProjectUsers(pid);
       const list = users.filter((user) => user.id && user.id !== userId);
       setProjectUsers(list);
       const ids = list.map((u) => u.id).filter(Boolean);

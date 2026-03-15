@@ -67,8 +67,6 @@ export default function SettingsMembersPage() {
     }
   }
 
-  const currentProject = projects.find((p) => p.id === effectiveProjectId);
-
   return (
     <main className="mx-auto max-w-3xl bg-[var(--background)] px-4 py-8 text-[var(--foreground)]">
       <h1 className="text-2xl font-bold">Members</h1>

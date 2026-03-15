@@ -24,11 +24,6 @@ type EventItem = {
   userId?: string;
 };
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 const inputClass =
   "w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2.5 text-[var(--foreground)] placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent";
 
@@ -401,11 +396,13 @@ export default function StatisticsEventsPage() {
           type="range"
           placeholder="Pick period"
           value={rangeValue}
-          onChange={handleRangeChange}
+          onChange={(value) => {
+            handleRangeChange(value);
+            if (value.every((v) => v == null)) clearPeriod();
+          }}
           disabled={loading}
           valueFormat="DD MMM YYYY"
           clearable
-          onClear={clearPeriod}
           aria-label="Select date range"
           className="[&_.mantine-Input-input]:cursor-pointer [&_.mantine-Input-input]:text-center [&_.mantine-Input-input]:font-bold"
           styles={{

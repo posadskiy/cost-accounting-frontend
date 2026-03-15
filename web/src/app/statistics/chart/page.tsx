@@ -27,7 +27,6 @@ function getCategoryDisplayName(
   if (!categoryId) return "—";
   const found = projectCategories.find((c) => c.id === categoryId);
   if (found) return found.emoji ? `${found.emoji} ${found.name}` : found.name;
-  if (found) return found.emoji ? `${found.emoji} ${found.name}` : found.name;
   return "—";
 }
 
