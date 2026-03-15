@@ -7,6 +7,7 @@ import {
   revokeProjectInvite,
   loadProjectMembers,
   loadProjectsForUser,
+  loadUsernames,
 } from "@/lib/api/profileService";
 import type { ProjectInvite, ProjectMember } from "@/lib/api/profileService";
 
@@ -40,6 +41,7 @@ export default function SettingsInvitesPage() {
   const queryClient = useQueryClient();
   const [invites, setInvites] = useState<ProjectInvite[]>([]);
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [projects, setProjects] = useState<{ id: string; name?: string }[]>([]);
   const [effectiveProjectId, setEffectiveProjectId] = useState(projectId ?? "");
   const [isOwner, setIsOwner] = useState(false);
@@ -67,6 +69,7 @@ export default function SettingsInvitesPage() {
     if (!effectiveProjectId) {
       setInvites([]);
       setMembers([]);
+      setUsernames({});
       setIsOwner(false);
       return;
     }
@@ -78,6 +81,12 @@ export default function SettingsInvitesPage() {
       setMembers(memberList);
       const me = memberList.find((m) => m.userId === userId);
       setIsOwner(me?.role === "OWNER");
+      const ids = memberList.map((m) => m.userId).filter((id): id is string => Boolean(id));
+      if (ids.length > 0) {
+        loadUsernames(ids).then(setUsernames);
+      } else {
+        setUsernames({});
+      }
     });
   }, [userId, effectiveProjectId]);
 
@@ -270,7 +279,7 @@ export default function SettingsInvitesPage() {
                         </p>
                         {usedBy.length > 0 && (
                           <p className="mt-1 text-xs text-neutral-500">
-                            Joined via this invite: {usedBy.map((m) => m.userId).join(", ")}
+                            Joined via this invite: {usedBy.map((m) => (m.userId ? (usernames[m.userId] ?? m.userId) : "—")).join(", ")}
                           </p>
                         )}
                       </div>

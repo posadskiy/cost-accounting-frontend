@@ -16,6 +16,8 @@ export type ProfileSettings = {
   locale: string;
   notificationsEnabled: boolean;
   activeProjectId?: string | null;
+  /** True once user has created or joined a project. */
+  onboarded?: boolean;
 };
 
 /** Project-scoped category. Only OWNER can edit. */
@@ -32,6 +34,7 @@ export type ProjectCategory = {
 
 export type OnboardingResult = {
   needsProjectSelection: boolean;
+  onboarded: boolean;
 };
 
 /** Ensures default records exist for the user (e.g. default categories). Idempotent; call after first login. Does not create a project. */
@@ -40,7 +43,7 @@ export async function runOnboarding(userId: string): Promise<OnboardingResult> {
     `${endpoints.profileServiceBaseUrl}/v1/profile/settings/onboarding/${userId}`,
     { method: "POST" }
   );
-  if (!response.ok) return { needsProjectSelection: true };
+  if (!response.ok) return { needsProjectSelection: true, onboarded: false };
   return (await response.json()) as OnboardingResult;
 }
 
@@ -61,6 +64,19 @@ export async function updateProfileSettings(userId: string, payload: Partial<Pro
   return (await response.json()) as ProfileSettings;
 }
 
+/** Load usernames for given user IDs from profile_settings. Returns map userId -> username (missing/empty omitted). */
+export async function loadUsernames(userIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(userIds)].filter(Boolean);
+  if (ids.length === 0) return {};
+  const q = ids.map((id) => encodeURIComponent(id)).join(",");
+  const response = await apiFetch(
+    `${endpoints.profileServiceBaseUrl}/v1/profile/settings/usernames?userIds=${q}`,
+    { method: "GET" }
+  );
+  if (!response.ok) return {};
+  return (await response.json()) as Record<string, string>;
+}
+
 /** Set the active project for the user (persists across sessions). */
 export async function setActiveProject(userId: string, projectId: string): Promise<boolean> {
   const response = await apiFetch(
@@ -74,7 +90,7 @@ export async function setActiveProject(userId: string, projectId: string): Promi
 export async function loadProjectCategories(projectId: string): Promise<ProjectCategory[]> {
   if (!projectId) return [];
   const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories`,
+    `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/categories`,
     { method: "GET" }
   );
   if (!response.ok) return [];
@@ -83,7 +99,7 @@ export async function loadProjectCategories(projectId: string): Promise<ProjectC
 
 /** Load all projects the user is a member of (includes project currency). */
 export async function loadProjectsForUser(userId: string): Promise<Project[]> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/projects/${userId}`, {
+  const response = await apiFetch(`${endpoints.projectServiceBaseUrl}/v1/projects/${userId}`, {
     method: "GET",
   });
   if (!response.ok) return [];
@@ -98,7 +114,7 @@ export type CreateProjectPayload = {
 
 /** Create a new project and set it as active for the owner. */
 export async function createProject(payload: CreateProjectPayload): Promise<Project | null> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/projects`, {
+  const response = await apiFetch(`${endpoints.projectServiceBaseUrl}/v1/projects`, {
     method: "POST",
     body: JSON.stringify({
       ownerUserId: payload.ownerUserId,
@@ -127,7 +143,7 @@ export type JoinProjectResult = {
 export async function joinProjectByCode(
   payload: JoinProjectByCodePayload
 ): Promise<JoinProjectResult | null> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/projects/join`, {
+  const response = await apiFetch(`${endpoints.projectServiceBaseUrl}/v1/projects/join`, {
     method: "POST",
     body: JSON.stringify({ userId: payload.userId, code: payload.code.trim().toUpperCase() }),
   });
@@ -147,7 +163,7 @@ export type ProjectMember = {
 /** Load project members (includes role). Use to check if current user is OWNER. */
 export async function loadProjectMembers(projectId: string): Promise<ProjectMember[]> {
   const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/members`,
+    `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/members`,
     { method: "GET" }
   );
   if (!response.ok) return [];
@@ -161,7 +177,7 @@ export async function updateProjectCurrency(
   currency: string
 ): Promise<Project | null> {
   const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}`,
+    `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}`,
     {
       method: "PUT",
       body: JSON.stringify({ requesterUserId, currency }),
@@ -177,7 +193,7 @@ export async function createProjectCategory(
   payload: Omit<ProjectCategory, "id" | "projectId">,
   requesterUserId: string
 ): Promise<ProjectCategory | null> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/categories?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -193,7 +209,7 @@ export async function updateProjectCategory(
   payload: Partial<Omit<ProjectCategory, "id" | "projectId">>,
   requesterUserId: string
 ): Promise<ProjectCategory | null> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, { method: "PUT", body: JSON.stringify(payload) });
   if (!response.ok) return null;
   return (await response.json()) as ProjectCategory;
@@ -205,7 +221,7 @@ export async function deleteProjectCategory(
   categoryId: string,
   requesterUserId: string
 ): Promise<boolean> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/categories/${categoryId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, { method: "DELETE" });
   return response.ok;
 }
@@ -226,7 +242,7 @@ export async function loadProjectInvites(
   projectId: string,
   requesterUserId: string
 ): Promise<ProjectInvite[]> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/invites?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/invites?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, { method: "GET" });
   if (!response.ok) return [];
   return (await response.json()) as ProjectInvite[];
@@ -252,7 +268,7 @@ export async function createProjectInvite(
   payload: CreateProjectInvitePayload
 ): Promise<CreateProjectInviteResult | null> {
   const response = await apiFetch(
-    `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/invites`,
+    `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/invites`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -272,7 +288,7 @@ export async function revokeProjectInvite(
   inviteId: string,
   requesterUserId: string
 ): Promise<boolean> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/invites/${inviteId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/invites/${inviteId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, { method: "DELETE" });
   return response.ok;
 }
@@ -283,7 +299,7 @@ export async function removeProjectMember(
   memberUserId: string,
   requesterUserId: string
 ): Promise<boolean> {
-  const url = `${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/members/${memberUserId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
+  const url = `${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/members/${memberUserId}?requesterUserId=${encodeURIComponent(requesterUserId)}`;
   const response = await apiFetch(url, { method: "DELETE" });
   return response.ok;
 }

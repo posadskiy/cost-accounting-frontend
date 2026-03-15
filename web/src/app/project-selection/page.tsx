@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { currentUserId, setCurrentProjectId } from "@/lib/api/auth";
-import { createProject, joinProjectByCode } from "@/lib/api/profileService";
+import { createProject, joinProjectByCode, setActiveProject } from "@/lib/api/profileService";
 import { loadCurrencies as loadCurrencyList } from "@/lib/api/moneyActions";
 
 const inputClass =
@@ -34,6 +34,7 @@ export default function ProjectSelectionPage() {
       currency: createCurrency,
     });
     if (project) {
+      await setActiveProject(userId, project.id);
       setCurrentProjectId(project.id);
       navigate("/", { replace: true });
     } else {
@@ -51,6 +52,7 @@ export default function ProjectSelectionPage() {
       code: joinCode.trim().toUpperCase(),
     });
     if (result?.projectId) {
+      await setActiveProject(userId, result.projectId);
       setCurrentProjectId(result.projectId);
       navigate("/", { replace: true });
     } else {

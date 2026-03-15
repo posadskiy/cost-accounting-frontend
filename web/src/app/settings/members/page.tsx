@@ -3,8 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { currentProjectId, currentUserId } from "@/lib/api/auth";
 import {
   loadProjectMembers,
-  removeProjectMember,
   loadProjectsForUser,
+  loadUsernames,
+  removeProjectMember,
 } from "@/lib/api/profileService";
 import type { ProjectMember } from "@/lib/api/profileService";
 
@@ -16,6 +17,7 @@ export default function SettingsMembersPage() {
   const projectId = currentProjectId();
   const queryClient = useQueryClient();
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [projects, setProjects] = useState<{ id: string; name?: string }[]>([]);
   const [effectiveProjectId, setEffectiveProjectId] = useState(projectId ?? "");
   const [isOwner, setIsOwner] = useState(false);
@@ -34,6 +36,7 @@ export default function SettingsMembersPage() {
   useEffect(() => {
     if (!effectiveProjectId) {
       setMembers([]);
+      setUsernames({});
       setIsOwner(false);
       return;
     }
@@ -41,6 +44,12 @@ export default function SettingsMembersPage() {
       setMembers(list);
       const me = list.find((m) => m.userId === userId);
       setIsOwner(me?.role === "OWNER");
+      const ids = list.map((m) => m.userId).filter((id): id is string => Boolean(id));
+      if (ids.length > 0) {
+        loadUsernames(ids).then(setUsernames);
+      } else {
+        setUsernames({});
+      }
     });
   }, [userId, effectiveProjectId]);
 
@@ -104,7 +113,9 @@ export default function SettingsMembersPage() {
                   className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
                 >
                   <div>
-                    <span className="font-medium">{m.userId ?? "—"}</span>
+                    <span className="font-medium">
+                      {m.userId ? (usernames[m.userId] ?? m.userId) : "—"}
+                    </span>
                     <span className="ml-2 text-sm text-neutral-500">
                       {m.role === "OWNER" ? "Owner" : "Member"}
                     </span>

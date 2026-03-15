@@ -9,7 +9,7 @@ import {
   saveIncome,
   savePurchase,
 } from "@/lib/api/moneyActions";
-import { loadProjectCategories, loadProjectMembers } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProjectMembers, loadUsernames } from "@/lib/api/profileService";
 import { loadEventsList } from "@/lib/api/statistics";
 
 type EventItem = {
@@ -131,6 +131,7 @@ export default function StatisticsEventsPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
 
   const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1, 12, 0, 0);
   const todayNoon = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
@@ -175,6 +176,15 @@ export default function StatisticsEventsPage() {
     queryFn: () => loadProjectMembers(projectId!),
     enabled: !!projectId,
   });
+
+  useEffect(() => {
+    const ids = [...new Set(actions.map((a) => a.userId).filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) {
+      setUsernames({});
+      return;
+    }
+    loadUsernames(ids).then(setUsernames);
+  }, [actions]);
 
   const isProjectOwner = members.some((m) => m.userId === userId && m.role === "OWNER");
 
@@ -642,9 +652,9 @@ export default function StatisticsEventsPage() {
                   <div>
                     <dt className="opacity-70">Created by</dt>
                     <dd className="font-medium">
-                      {selectedEvent.userId && selectedEvent.userId === userId
+                      {selectedEvent.userId === userId
                         ? "You"
-                        : selectedEvent.userId ?? "—"}
+                        : (selectedEvent.userId && (usernames[selectedEvent.userId] ?? selectedEvent.userId)) ?? "—"}
                     </dd>
                   </div>
                   <div>

@@ -8,7 +8,7 @@ import {
   saveSplitIncome,
   saveSplitPurchase,
 } from "@/lib/api/moneyActions";
-import { loadProjectCategories, loadProfileSettings, loadProjectsForUser } from "@/lib/api/profileService";
+import { loadProjectCategories, loadProfileSettings, loadProjectsForUser, loadUsernames } from "@/lib/api/profileService";
 import { loadProjectUsers, ProjectUser } from "@/lib/api/user";
 
 type Mode = "purchase" | "income";
@@ -51,6 +51,7 @@ export default function AddPage() {
   const [currency, setCurrency] = useState("USD");
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [projectUsers, setProjectUsers] = useState<ProjectUser[]>([]);
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>([]);
   const [amountOverrides, setAmountOverrides] = useState<Record<string, number>>({});
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
@@ -83,9 +84,9 @@ export default function AddPage() {
   );
   const participantList = useMemo(() => {
     const getName = (id: string) =>
-      id === userId ? "Me" : projectUsers.find((u) => u.id === id)?.name?.trim() || projectUsers.find((u) => u.id === id)?.email?.trim() || id;
+      id === userId ? "Me" : usernames[id] ?? projectUsers.find((u) => u.id === id)?.name?.trim() ?? projectUsers.find((u) => u.id === id)?.email?.trim() ?? id;
     return participantIds.map((id) => ({ id, name: getName(id) }));
-  }, [participantIds, userId, projectUsers]);
+  }, [participantIds, userId, projectUsers, usernames]);
 
   const totalAmount = Number(amount || "0") || 0;
   const splitAmounts = useMemo(
@@ -127,11 +128,19 @@ export default function AddPage() {
   useEffect(() => {
     if (!projectId) {
       setProjectUsers([]);
+      setUsernames({});
       return;
     }
     async function loadUsers() {
       const users = await loadProjectUsers(projectId);
-      setProjectUsers(users.filter((user) => user.id && user.id !== userId));
+      const list = users.filter((user) => user.id && user.id !== userId);
+      setProjectUsers(list);
+      const ids = list.map((u) => u.id).filter(Boolean);
+      if (ids.length > 0) {
+        loadUsernames(ids).then(setUsernames);
+      } else {
+        setUsernames({});
+      }
     }
     loadUsers();
   }, [projectId, userId]);

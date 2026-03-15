@@ -46,7 +46,7 @@ export async function updateUser(profile: UserProfile): Promise<UserProfile | nu
 }
 
 export async function loadProjectUsers(projectId: string): Promise<ProjectUser[]> {
-  const response = await apiFetch(`${endpoints.profileServiceBaseUrl}/v1/profile/projects/${projectId}/members`, {
+  const response = await apiFetch(`${endpoints.projectServiceBaseUrl}/v1/projects/${projectId}/members`, {
     method: "GET",
   });
   if (!response.ok) return [];
