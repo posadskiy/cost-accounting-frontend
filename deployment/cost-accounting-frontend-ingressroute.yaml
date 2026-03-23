@@ -1,0 +1,19 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: cost-accounting-frontend
+  namespace: costy
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`costy.posadskiy.com`)
+      kind: Rule
+      services:
+        - name: cost-accounting-frontend
+          port: 3000
+      priority: 10
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: costy.posadskiy.com

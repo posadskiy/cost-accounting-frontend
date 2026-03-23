@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cost-accounting-frontend
+  namespace: costy
+  labels:
+    app: cost-accounting-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cost-accounting-frontend
+  template:
+    metadata:
+      labels:
+        app: cost-accounting-frontend
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-registry-secret
+      containers:
+        - name: cost-accounting-frontend
+          image: ${DOCKERHUB_USERNAME}/cost-accounting-frontend:${IMAGE_VERSION}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cost-accounting-frontend
+  namespace: costy
+  labels:
+    app: cost-accounting-frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: cost-accounting-frontend
