@@ -1,40 +1,71 @@
-# Costy Web
+# Costy Web App
 
-This app replaces the legacy React Native client in-place with a React web client while preserving feature parity.
+The core SPA for the Costy platform — a personal and collaborative budget tracker built with React and Vite.
 
-## Stack
+## Auth Model
 
-- Next.js 16 (App Router)
-- React 19
-- TypeScript 5 (strict)
-- Tailwind CSS 4
-- ESLint 9
+- Access token stored **in memory only** (no localStorage)
+- Refresh token managed via **HttpOnly cookie**
+- Automatic 401 → refresh → retry flow in `src/lib/api/httpClient.ts`
+- Auth UI provided by `auth-component-react`
 
-## Auth model
+## Pages
 
-- SPA-direct API calls
-- Access token stored in memory only
-- Refresh token handled by HttpOnly cookie
-- 401 refresh-and-retry flow in `src/lib/api/httpClient.ts`
+| Route | Description |
+|-------|-------------|
+| `/login` | Email/password login |
+| `/register` | New account registration |
+| `/project-selection` | Choose or create a project |
+| `/dashboard` | Project overview and quick actions |
+| `/purchase/new` | Add a new purchase |
+| `/income/new` | Add a new income |
+| `/add` | Quick-add transaction selector |
+| `/statistics/events` | Transaction event timeline |
+| `/statistics/chart` | Spending breakdown charts |
+| `/settings/profile` | User profile preferences |
+| `/settings/categories` | Manage purchase/income categories |
+| `/settings/limits` | Set category spending limits |
+| `/settings/members` | View and manage project members |
+| `/settings/invites` | Create and revoke invite codes |
+| `/settings/general` | General project settings |
 
-## Feature parity targets
+## Scripts
 
-- Login
-- Add purchase/income
-- Statistics events and chart
-- User profile and categories
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | TypeScript check + production build |
+| `npm run preview` | Preview production build locally |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run Vitest test suite |
 
-## Local run
+## Setup
 
 ```bash
 cp .env.example .env
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+The dev server starts at [http://localhost:5173](http://localhost:5173).
 
-## Quality gates
+## Environment Variables
 
-- `npm run lint`
-- `npm run build`
+See `.env.example` for the full list. All variables are prefixed with `VITE_` and configure backend service URLs:
+
+```
+VITE_AUTH_URL=http://localhost:8100
+VITE_USER_URL=http://localhost:8095
+VITE_MONEY_ACTIONS_URL=http://localhost:8300
+VITE_STATISTICS_URL=http://localhost:8301
+VITE_PROFILE_SERVICE_URL=http://localhost:8302
+VITE_PROJECT_SERVICE_URL=http://localhost:8303
+```
+
+## Production Build
+
+```bash
+npm run build
+```
+
+Output goes to `dist/`. Served by Nginx in production (`nginx.prod.conf`), with a `/health` endpoint for Kubernetes liveness probes.
