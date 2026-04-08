@@ -1,6 +1,10 @@
+import { initFaro } from "@/lib/observability/faro";
+initFaro();
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import { withFaroRouterInstrumentation } from "@grafana/faro-react";
 import App from "./App";
 import RequireAuth from "./components/RequireAuth";
 
@@ -21,7 +25,7 @@ import SettingsGeneralPage from "./app/settings/general/page";
 import SettingsMembersPage from "./app/settings/members/page";
 import SettingsInvitesPage from "./app/settings/invites/page";
 
-const router = createBrowserRouter([
+const router = withFaroRouterInstrumentation(createBrowserRouter([
   {
     path: "/",
     element: <App />,
@@ -58,7 +62,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-]);
+]));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

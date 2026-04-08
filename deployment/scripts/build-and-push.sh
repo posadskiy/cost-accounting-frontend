@@ -19,6 +19,12 @@ fi
 VERSION=$1
 TAG_DATE=$(date +%Y%m%d%H%M%S)
 
+if [ -z "$GRAFANA_OBSERVABILITY_FARO_TOKEN" ]; then
+  echo "⚠️  GRAFANA_OBSERVABILITY_FARO_TOKEN not set — source maps will NOT be uploaded to Grafana Cloud."
+  echo "   Stack traces in Frontend Observability will show minified code."
+  echo "   Obtain the token from Grafana Cloud → Access Policies → faro-observability-token."
+fi
+
 echo "🚀 Building and pushing $SERVICE_NAME (version: $VERSION)..."
 docker buildx build --platform linux/arm64 \
   --build-arg VITE_AUTH_URL=https://api.posadskiy.com/auth \
@@ -28,6 +34,9 @@ docker buildx build --platform linux/arm64 \
   --build-arg VITE_PROFILE_SERVICE_URL=https://api.costy.posadskiy.com/profile \
   --build-arg VITE_PROJECT_SERVICE_URL=https://api.costy.posadskiy.com/project \
   --build-arg VITE_BFF_WEB_URL=https://api.costy.posadskiy.com/project \
+  --build-arg VITE_FARO_URL=https://faro-collector-prod-eu-west-2.grafana.net/collect/ceb10bda6314a7736ffdcb52b7848c7b \
+  --build-arg VITE_APP_VERSION="$VERSION" \
+  --build-arg GRAFANA_OBSERVABILITY_FARO_TOKEN="${GRAFANA_OBSERVABILITY_FARO_TOKEN:-}" \
   -f "$WEB_DIR/Dockerfile.prod" \
   -t "$DOCKERHUB_USERNAME/$SERVICE_NAME:$VERSION" \
   -t "$DOCKERHUB_USERNAME/$SERVICE_NAME:$TAG_DATE" \
