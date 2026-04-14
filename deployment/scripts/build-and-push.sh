@@ -17,7 +17,6 @@ if [ $# -lt 1 ]; then
 fi
 
 VERSION=$1
-TAG_DATE=$(date +%Y%m%d%H%M%S)
 
 if [ -z "$GRAFANA_OBSERVABILITY_FARO_TOKEN" ]; then
   echo "⚠️  GRAFANA_OBSERVABILITY_FARO_TOKEN not set — source maps will NOT be uploaded to Grafana Cloud."
@@ -39,7 +38,6 @@ docker buildx build --platform linux/arm64 \
   --build-arg GRAFANA_OBSERVABILITY_FARO_TOKEN="${GRAFANA_OBSERVABILITY_FARO_TOKEN:-}" \
   -f "$WEB_DIR/Dockerfile.prod" \
   -t "$DOCKERHUB_USERNAME/$SERVICE_NAME:$VERSION" \
-  -t "$DOCKERHUB_USERNAME/$SERVICE_NAME:$TAG_DATE" \
   -t "$DOCKERHUB_USERNAME/$SERVICE_NAME:latest" \
   "$WEB_DIR" --push
 
